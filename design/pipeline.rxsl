@@ -1,65 +1,35 @@
-struct Camera {
-  projection: mat4<f32>,
-}
+use lib::*;
+use std::stage::Vertex;
 
-struct ObjectRenderMatrix {
-  model_view: mat4<f32>,
-  normal: mat3<f32>,
-}
-
-impl Camera {
-  injection {
-    
+graphics pipeline Base3D {
+  groups {
+    { object: ObjectRenderMatrix },
+    { camera: Camera},
   }
-}
 
-mesh Standard {
-  position: vec3<f32>,
-  normal: vec3<f32>,
-  uv: vec2<f32>
-}
-
-
-pipeline MyTestPipeline {
   vertex shader {
-    input {
-      vertex [
-        mesh: Standard,
-      ],
-      groups [
-        { 
-          camera: Camera
-        },
-        {
-          object: ObjectRenderMatrix
-        }
-      ]
-    }
-
-    output {
-      model_view_position_v: vec3<f32>,
-      normal: vec3<f32>,
-      uv: vec2<f32>
-    }
-
-    output model_view_position_v() -> vec3<f32> {
-      -model_view_position()
-    }
+    input { mesh: Standard, }
 
     fn main {
       let model_view_position = object.model_view * mesh.position;
       Vertex::ClipPosition = camera.projection * model_view_position;
-      output.model_view_position = -model_view_position;
-      output.normal = object.normal * mesh.normal;
-      output.uv = mesh.uv;
+      fragment.model_view_position = -model_view_position;
+      fragment.normal = object.normal * mesh.normal;
+      fragment.uv = mesh.uv;
     }
   }
 
   fragment shader {
-
+    input {
+      model_view_position: vec3<f32>,
+      normal: vec3<f32>,
+      uv: vec2<f32>
+    }
   }
 }
 
-pipeline MyTestPipelineExtension extend MyTestPipeline {
+graphics pipeline MyTestPipelineExtension extend MyTestPipeline {
+  extend input{
 
+  }
 }
