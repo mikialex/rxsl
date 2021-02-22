@@ -4,7 +4,7 @@ use std::stage::Vertex;
 graphics pipeline Base3D {
   groups {
     { object: ObjectRenderMatrix },
-    { camera: Camera},
+    { camera: Camera },
   }
 
   vertex shader {
@@ -28,8 +28,21 @@ graphics pipeline Base3D {
   }
 }
 
-graphics pipeline MyTestPipelineExtension extend MyTestPipeline {
-  extend input{
-
+graphics pipeline BasicMaterial extend Base3D {
+  extend groups {
+    [0] {
+      #[optional]
+      color_map: Texture2D,
+      #[optional]
+      color_map_uv_matrix: mat3<f32>,
+      color: vec3<f32>,
+    }
   }
+
+  vertex shader {
+  }
+
+  fragment shader {
+  }
+  
 }
