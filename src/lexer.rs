@@ -1,10 +1,24 @@
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Token<'a> {
+    Separator(char),
+    DoubleColon,
+    Paren(char),
+    DoubleParen(char),
+    Number {
+        value: &'a str,
+        ty: char,
+        width: &'a str,
+    },
+    String(&'a str),
     Word(&'a str),
-    Space(&'a str),
-    Number(&'a str),
-    Unknown(&'a str),
-    EOF,
+    Operation(char),
+    LogicalOperation(char),
+    ShiftOperation(char),
+    Arrow,
+    Unknown(char),
+    UnterminatedString,
+    Trivia,
+    End,
 }
 
 pub struct Lexer<'a> {
@@ -14,5 +28,150 @@ pub struct Lexer<'a> {
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
         Lexer { input }
+    }
+}
+
+fn consume_any(input: &str, what: impl Fn(char) -> bool) -> (&str, &str) {
+    let pos = input.find(|c| !what(c)).unwrap_or_else(|| input.len());
+    input.split_at(pos)
+}
+
+fn consume_number(input: &str) -> (Token, &str) {
+    //Note: I wish this function was simpler and faster...
+    let mut is_first_char = true;
+    let mut right_after_exponent = false;
+
+    let mut what = |c| {
+        if is_first_char {
+            is_first_char = false;
+            c == '-' || ('0'..='9').contains(&c) || c == '.'
+        } else if c == 'e' || c == 'E' {
+            right_after_exponent = true;
+            true
+        } else if right_after_exponent {
+            right_after_exponent = false;
+            ('0'..='9').contains(&c) || c == '-'
+        } else {
+            ('0'..='9').contains(&c) || c == '.'
+        }
+    };
+    let pos = input.find(|c| !what(c)).unwrap_or_else(|| input.len());
+    let (value, rest) = input.split_at(pos);
+
+    let mut rest_iter = rest.chars();
+    let ty = rest_iter.next().unwrap_or(' ');
+    match ty {
+        'u' | 'i' | 'f' => {
+            let width_end = rest_iter
+                .position(|c| !('0'..='9').contains(&c))
+                .unwrap_or_else(|| rest.len() - 1);
+            let (width, rest) = rest[1..].split_at(width_end);
+            (Token::Number { value, ty, width }, rest)
+        }
+        // default to `i32` or `f32`
+        _ => (
+            Token::Number {
+                value,
+                ty: if value.contains('.') { 'f' } else { 'i' },
+                width: "",
+            },
+            rest,
+        ),
+    }
+}
+
+fn consume_token(mut input: &str, generic: bool) -> (Token<'_>, &str) {
+    let mut chars = input.chars();
+    let cur = match chars.next() {
+        Some(c) => c,
+        None => return (Token::End, input),
+    };
+    match cur {
+        ':' => {
+            input = chars.as_str();
+            if chars.next() == Some(':') {
+                (Token::DoubleColon, chars.as_str())
+            } else {
+                (Token::Separator(cur), input)
+            }
+        }
+        ';' | ',' => (Token::Separator(cur), chars.as_str()),
+        '.' => {
+            let og_chars = chars.as_str();
+            match chars.next() {
+                Some('0'..='9') => consume_number(input),
+                _ => (Token::Separator(cur), og_chars),
+            }
+        }
+        '(' | ')' | '{' | '}' => (Token::Paren(cur), chars.as_str()),
+        '<' | '>' => {
+            input = chars.as_str();
+            let next = chars.next();
+            if next == Some('=') && !generic {
+                (Token::LogicalOperation(cur), chars.as_str())
+            } else if next == Some(cur) && !generic {
+                (Token::ShiftOperation(cur), chars.as_str())
+            } else {
+                (Token::Paren(cur), input)
+            }
+        }
+        '[' | ']' => {
+            input = chars.as_str();
+            if chars.next() == Some(cur) {
+                (Token::DoubleParen(cur), chars.as_str())
+            } else {
+                (Token::Paren(cur), input)
+            }
+        }
+        '0'..='9' => consume_number(input),
+        'a'..='z' | 'A'..='Z' | '_' => {
+            let (word, rest) = consume_any(input, |c| c.is_ascii_alphanumeric() || c == '_');
+            (Token::Word(word), rest)
+        }
+        '"' => {
+            let mut iter = chars.as_str().splitn(2, '"');
+
+            // splitn returns an iterator with at least one element, so unwrapping is fine
+            let quote_content = iter.next().unwrap();
+            if let Some(rest) = iter.next() {
+                (Token::String(quote_content), rest)
+            } else {
+                (Token::UnterminatedString, quote_content)
+            }
+        }
+        '/' if chars.as_str().starts_with('/') => {
+            let _ = chars.position(|c| c == '\n' || c == '\r');
+            (Token::Trivia, chars.as_str())
+        }
+        '-' => {
+            let og_chars = chars.as_str();
+            match chars.next() {
+                Some('>') => (Token::Arrow, chars.as_str()),
+                Some('0'..='9') | Some('.') => consume_number(input),
+                _ => (Token::Operation(cur), og_chars),
+            }
+        }
+        '+' | '*' | '/' | '%' | '^' => (Token::Operation(cur), chars.as_str()),
+        '!' => {
+            input = chars.as_str();
+            if chars.next() == Some('=') {
+                (Token::LogicalOperation(cur), chars.as_str())
+            } else {
+                (Token::Operation(cur), input)
+            }
+        }
+        '=' | '&' | '|' => {
+            input = chars.as_str();
+            if chars.next() == Some(cur) {
+                (Token::LogicalOperation(cur), chars.as_str())
+            } else {
+                (Token::Operation(cur), input)
+            }
+        }
+        ' ' | '\n' | '\r' | '\t' => {
+            let (_, rest) = consume_any(input, |c| c == ' ' || c == '\n' || c == '\r' || c == '\t');
+            (Token::Trivia, rest)
+        }
+        _ => (Token::Unknown(cur), chars.as_str()),
     }
 }
