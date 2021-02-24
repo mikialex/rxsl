@@ -33,11 +33,10 @@ pub graphics pipeline Base3D {
 
 pub graphics component Fog {
   groups {
-    { fog: FogData },
+    per_frame: { fog: FogData },
   }
 
   depend {
-    color: Fragment::FragmentColor,
     view_position: vec3<f32>,
     camera_position: vec3<f32>,
   }
@@ -80,7 +79,7 @@ pub graphics pipeline BasicMaterial extend Base3D {
   fragment shader {
     color() -> vec3<f32> {
       if color_map.exist! && color_map_uv_matrix.exist! {
-        
+        color_map.sample(fragment.uv)
       } else {
         color
       }
