@@ -12,3 +12,15 @@ pub mesh Standard {
   normal: vec3<f32>,
   uv: vec2<f32>
 }
+
+
+uniform FogData{
+  color: vec3<f32>,
+}
+
+impl FogData {
+  fn compute(self, distance: f32) -> vec<f32> {
+    let effect = clamp((self.fog_end - distance) / (self.fog_end - self.fog_start), 0.0, 1.0);
+    mix(self.color, self.fog_color.xyz, 1.0 - effect)
+  }
+}

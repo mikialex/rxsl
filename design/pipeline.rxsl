@@ -1,17 +1,20 @@
 use lib::*;
 use std::stage::Vertex;
 
-graphics pipeline Base3D {
+pub graphics pipeline Base3D {
   groups {
-    { object: ObjectRenderMatrix },
-    { camera: Camera },
+    per_object: { object: ObjectRenderMatrix },
+    per_frame: { camera: Camera },
   }
 
   vertex shader {
-    input { mesh: Standard, }
+    input { mesh: Standard }
 
-    fn main {
-      let model_view_position = object.model_view * mesh.position;
+    fn model_view_position() -> vec3<f32> {
+      object.model_view * mesh.position
+    }
+
+    fn main() {
       Vertex::ClipPosition = camera.projection * model_view_position;
       fragment.model_view_position = -model_view_position;
       fragment.normal = object.normal * mesh.normal;
@@ -28,21 +31,62 @@ graphics pipeline Base3D {
   }
 }
 
-graphics pipeline BasicMaterial extend Base3D {
+pub graphics component Fog {
+  groups {
+    { fog: FogData },
+  }
+
+  depend {
+    color: Fragment::FragmentColor,
+    view_position: vec3<f32>,
+    camera_position: vec3<f32>,
+  }
+
+  output {
+    color: Fragment::FragmentColor,
+  }
+
+  fn main {
+    color = fog.compute()
+  }
+}
+
+impl FogData dependency for Base3D{
+  view_position,
+  camera_position: {
+     
+  }
+}
+
+pub graphics pipeline BasicMaterial extend Base3D {
   extend groups {
-    [0] {
+    per_object {
       #[optional]
       color_map: Texture2D,
       #[optional]
       color_map_uv_matrix: mat3<f32>,
+      #[optional]
       color: vec3<f32>,
     }
   }
 
   vertex shader {
+    fn main {
+      super();
+      
+    }
   }
 
   fragment shader {
+    color() -> vec3<f32> {
+      if color_map.exist! && color_map_uv_matrix.exist! {
+        
+      } else {
+        color
+      }
+    }
+
+
   }
   
 }
