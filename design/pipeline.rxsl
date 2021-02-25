@@ -31,6 +31,11 @@ pub graphics pipeline Base3D {
   }
 }
 
+pub trait Shape{
+  fn vertex_position() -> vec3<f32>
+  fn discard() -> vec3<f32>,
+}
+
 pub graphics component Fog {
   groups {
     per_frame: { fog: FogData },
