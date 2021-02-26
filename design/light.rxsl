@@ -1,0 +1,45 @@
+
+pub trait DirectLightGeometricBase: Normal + ViewPosition {}
+
+struct ReflectedDirectLight {
+    directDiffuse: vec3<f32>;
+    directSpecular: vec3<f32>;
+};
+
+struct IncidentLight {
+    color: vec3<f32>;
+    direction: vec3<f32>;
+    visible: bool;
+}
+
+pub trait DirectLightMaterialBase {
+    fn compute_light(direct_light: IncidentLight) -> ReflectedDirectLight;
+}
+
+pub trait DirectLightComputeAble: DirectLightGeometricBase + DirectLightMaterialBase {}
+
+struct DirectionalLight {
+    position: vec3<f32>
+}
+
+pub component DirectLight require DirectLightComputeAble {
+  #[per_frame]
+  uniform light: DirectionalLight
+
+  override PixelColor::color0() -> vec4<f32> {
+    // 
+  }
+}
+
+pub component DirectLights require DirectLightComputeAble {
+  specialization {
+    light_count: u32;
+  }
+
+  #[per_frame]
+  uniform lights: DirectionalLight[light_count]
+
+  override PixelColor::color0() -> vec4<f32> {
+    // 
+  }
+}

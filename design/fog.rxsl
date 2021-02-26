@@ -1,0 +1,23 @@
+uniform FogData {
+  color: vec3<f32>,
+  fog_start: f32
+  fog_end: f32
+}
+
+impl FogData {
+  fn compute(self, distance: f32) -> vec<f32> {
+    let effect = clamp((self.fog_end - distance) / (self.fog_end - self.fog_start), 0.0, 1.0);
+    mix(self.color, self.fog_color.xyz, 1.0 - effect)
+  }
+}
+
+
+pub component Fog require PixelColor, ViewPosition {
+  #[per_frame]
+  uniform: fog: FogData
+
+  override PixelColor::color0() -> vec4<f32> {
+    fog.compute(ViewPosition::frag_view_position).(PixelColor::color0.a)
+  }
+  
+}

@@ -1,96 +1,37 @@
 use lib::*;
 use std::stage::Vertex;
 
-pub graphics pipeline Base3D {
-  groups {
-    per_object: { object: ObjectRenderMatrix },
-    per_frame: { camera: Camera },
-  }
-
-  vertex shader {
-    input { mesh: Standard }
-
-    fn model_view_position() -> vec3<f32> {
-      object.model_view * mesh.position
-    }
-
-    fn main() {
-      Vertex::ClipPosition = camera.projection * model_view_position;
-      fragment.model_view_position = -model_view_position;
-      fragment.normal = object.normal * mesh.normal;
-      fragment.uv = mesh.uv;
-    }
-  }
-
-  fragment shader {
-    input {
-      model_view_position: vec3<f32>,
-      normal: vec3<f32>,
-      uv: vec2<f32>
-    }
-  }
+// static pipeline:
+pipeline Base3D {
+  meshes: [ StandardMesh ]
+  components: [
+    camera: Camera3D,
+    dir_lights: DirectionalLights
+    fog: Fog
+  ]
 }
 
-pub trait Shape{
-  fn vertex_position() -> vec3<f32>
-  fn discard() -> vec3<f32>,
+// static compile to
+// a type safe struct
+struct Base3D {
+  ...
 }
 
-pub graphics component Fog {
-  groups {
-    per_frame: { fog: FogData },
-  }
+// runtime behavior 
 
-  depend {
-    view_position: vec3<f32>,
-    camera_position: vec3<f32>,
-  }
+// compose up from zero
 
-  output {
-    color: Fragment::FragmentColor,
-  }
+let shader_module = PipelineBuilder::new()
+  .mesh(geometry)
+  .component_abstract::<Camera3D>()
+  .component(lights)
+  .component(fog)
+  .validate()?
+  .compile()
 
-  fn main {
-    color = fog.compute()
-  }
-}
+// or compose on a type safe static one
 
-impl FogData dependency for Base3D{
-  view_position,
-  camera_position: {
-     
-  }
-}
-
-pub graphics pipeline BasicMaterial extend Base3D {
-  extend groups {
-    per_object {
-      #[optional]
-      color_map: Texture2D,
-      #[optional]
-      color_map_uv_matrix: mat3<f32>,
-      #[optional]
-      color: vec3<f32>,
-    }
-  }
-
-  vertex shader {
-    fn main {
-      super();
-      
-    }
-  }
-
-  fragment shader {
-    color() -> vec3<f32> {
-      if color_map.exist! && color_map_uv_matrix.exist! {
-        color_map.sample(fragment.uv)
-      } else {
-        color
-      }
-    }
-
-
-  }
-  
-}
+let shader_module = PipelineBuilder::extend_from(base3d)
+  .component(sth)
+  .validate()?
+  .compile()

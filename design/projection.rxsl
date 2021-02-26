@@ -1,0 +1,19 @@
+
+pub abstract component Camera3D require GeometricPosition {
+    #[per_object]
+    uniform model_view_matrix: mat4<f32>, 
+    #[per_frame]
+    uniform projection_matrix: mat4<f32>
+}
+
+impl ViewPosition for Camera3D {
+  vertex out view_position() -> vec3<f32> {
+     model_view_matrix * GeometricPosition::position
+  }
+}
+
+impl Shape for Camera3D {
+  vertex out position() -> vec3<f32> {
+    projection_matrix * ViewPosition::model_view_position;
+  }
+}
