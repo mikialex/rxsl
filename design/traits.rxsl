@@ -1,0 +1,33 @@
+pub trait PixelColor {
+  fragment out color0() -> vec4<f32>;
+}
+
+pub trait Shape {
+  vertex out position() -> vec3<f32>
+  fragment discard() -> bool {
+    false
+  }
+}
+
+pub trait Normal {
+  fragment normal() -> vec3<f32>
+}
+
+pub trait ViewPosition {
+  vertex out view_position() -> vec3<f32>
+  fragment frag_view_position() -> vec3<f32> {
+    vertex.view_position
+  }
+}
+
+pub trait GeometricPosition {
+    vertex in position() -> vec3<f32>
+}
+
+pub trait GeometricNormal {
+    vertex in normal() -> vec3<f32>
+}
+
+pub trait GeometricUV {
+    vertex in normal() -> vec3<f32>
+}
