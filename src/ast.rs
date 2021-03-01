@@ -4,6 +4,7 @@ pub enum ASTNode {
     Expression,
 }
 
+#[derive(Debug)]
 pub enum ParseError<'a> {
     Any(&'static str),
     Unexpected(TokenSpan<'a>, &'a str),
@@ -44,6 +45,7 @@ pub enum BinaryOperator {
     Sub,
     Mul,
     Div,
+    Mod,
 }
 
 pub enum Keyword {
