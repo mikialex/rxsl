@@ -1,5 +1,12 @@
+use crate::lexer::TokenSpan;
+
 pub enum ASTNode {
     Expression,
+}
+
+pub enum ParseError<'a> {
+    Any(&'static str),
+    Unexpected(TokenSpan<'a>, &'a str),
 }
 
 pub enum Expression {
@@ -8,18 +15,28 @@ pub enum Expression {
         expr: Box<Self>,
     },
     BinaryOperator {
-        op: BinaryOperator,
         left: Box<Self>,
+        op: BinaryOperator,
         right: Box<Self>,
     },
-    FunctionCall {
-        fn_name: String,
-        parameters: Vec<Expression>,
-    },
+    FunctionCall(FunctionCall),
+    Number {},
+    Bool(bool),
+    Ident(Ident),
+}
+
+pub struct FunctionCall {
+    pub name: String,
+    pub arguments: Vec<Expression>,
+}
+
+pub struct Ident {
+    pub name: String,
 }
 
 pub enum UnaryOperator {
     Neg,
+    Not,
 }
 
 pub enum BinaryOperator {

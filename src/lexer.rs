@@ -1,3 +1,7 @@
+use std::ops::Range;
+
+use crate::ast::ParseError;
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Token<'a> {
     Separator(char),
@@ -21,13 +25,99 @@ pub enum Token<'a> {
     End,
 }
 
+pub type TokenSpan<'a> = (Token<'a>, Range<usize>);
+
+#[derive(Clone)]
 pub struct Lexer<'a> {
     input: &'a str,
+    source: &'a str,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
-        Lexer { input }
+        Lexer {
+            input,
+            source: input,
+        }
+    }
+
+    fn peek_token_and_rest(&self) -> (TokenSpan<'a>, &'a str) {
+        let mut cloned = self.clone();
+        let token = cloned.next();
+        let rest = cloned.input;
+        (token, rest)
+    }
+
+    fn current_byte_offset(&self) -> usize {
+        self.source.len() - self.input.len()
+    }
+
+    #[must_use]
+    pub fn next(&mut self) -> TokenSpan<'a> {
+        let mut start_byte_offset = self.current_byte_offset();
+        loop {
+            let (token, rest) = consume_token(self.input, false);
+            self.input = rest;
+            match token {
+                Token::Trivia => start_byte_offset = self.current_byte_offset(),
+                _ => return (token, start_byte_offset..self.current_byte_offset()),
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn next_generic(&mut self) -> TokenSpan<'a> {
+        let mut start_byte_offset = self.current_byte_offset();
+        loop {
+            let (token, rest) = consume_token(self.input, true);
+            self.input = rest;
+            match token {
+                Token::Trivia => start_byte_offset = self.current_byte_offset(),
+                _ => return (token, start_byte_offset..self.current_byte_offset()),
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn peek(&self) -> TokenSpan<'a> {
+        let (token, _) = self.peek_token_and_rest();
+        token
+    }
+
+    pub fn expect(&mut self, expected: Token<'a>) -> Result<(), ParseError<'a>> {
+        let next = self.next();
+        if next.0 == expected {
+            Ok(())
+        } else {
+            let description = match expected {
+                Token::Separator(_) => "separator",
+                Token::DoubleColon => "::",
+                Token::Paren(_) => "paren",
+                Token::DoubleParen(_) => "double paren",
+                Token::Number { .. } => "number",
+                Token::String(string) => string,
+                Token::Word(word) => word,
+                Token::Operation(_) => "operation",
+                Token::LogicalOperation(_) => "logical op",
+                Token::ShiftOperation(_) => "shift op",
+                Token::Arrow => "->",
+                Token::Unknown(_) => "unknown",
+                Token::UnterminatedString => "string",
+                Token::Trivia => "trivia",
+                Token::End => "",
+            };
+            Err(ParseError::Unexpected(next, description))
+        }
+    }
+
+    pub fn if_skip(&mut self, what: Token<'_>) -> bool {
+        let (peeked_token, rest) = self.peek_token_and_rest();
+        if peeked_token.0 == what {
+            self.input = rest;
+            true
+        } else {
+            false
+        }
     }
 }
 
