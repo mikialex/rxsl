@@ -7,6 +7,8 @@ pub fn parse(input: &str) -> Expression {
 #[test]
 fn parse_expression_test() {
     parse("1");
+    parse("true");
+    parse("!(true)");
     parse("1+1");
     parse("1+(1)");
     parse("1+1*  3");

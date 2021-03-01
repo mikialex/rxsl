@@ -13,6 +13,7 @@ pub enum Token<'a> {
         ty: char,
         width: &'a str,
     },
+    Bool(bool),
     String(&'a str),
     Word(&'a str),
     Operation(char),
@@ -104,6 +105,7 @@ impl<'a> Lexer<'a> {
                 Token::Unknown(_) => "unknown",
                 Token::UnterminatedString => "string",
                 Token::Trivia => "trivia",
+                Token::Bool(_) => "boolean",
                 Token::End => "",
             };
             Err(ParseError::Unexpected(next, description))
@@ -216,7 +218,11 @@ fn consume_token(mut input: &str, generic: bool) -> (Token<'_>, &str) {
         '0'..='9' => consume_number(input),
         'a'..='z' | 'A'..='Z' | '_' => {
             let (word, rest) = consume_any(input, |c| c.is_ascii_alphanumeric() || c == '_');
-            (Token::Word(word), rest)
+            match word {
+                "true" => (Token::Bool(true), rest),
+                "false" => (Token::Bool(false), rest),
+                _ => (Token::Word(word), rest),
+            }
         }
         '"' => {
             let mut iter = chars.as_str().splitn(2, '"');

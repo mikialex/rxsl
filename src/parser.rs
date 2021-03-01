@@ -1,7 +1,7 @@
 use std::todo;
 
 use crate::{
-    ast::{BinaryOperator, Expression, FunctionCall, Ident, ParseError},
+    ast::{BinaryOperator, Expression, FunctionCall, Ident, ParseError, UnaryOperator},
     lexer::{Lexer, Token},
 };
 
@@ -16,6 +16,8 @@ use crate::{
 // => number
 // => bool
 
+// ============
+// after disambiguity and remove left recursion
 // ============
 
 // EXP
@@ -62,20 +64,27 @@ pub fn parse_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, ParseEr
     )
 }
 
-pub fn parse_bool<'a>(input: &mut Lexer<'a>) -> Result<bool, ParseError<'a>> {
-    let r = match input.next().0 {
-        Token::Word("true") => true,
-        Token::Word("false") => true,
-        _ => return Err(ParseError::Any("bool")),
-    };
-    Ok(r)
-}
-
 // EXP_SINGLE
 pub fn parse_single_expression<'a>(input: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {
     let r = match input.next().0 {
         Token::Number { .. } => Expression::Number {},
-        Token::Operation('-') => parse_expression(input)?,
+        Token::Bool(v) => Expression::Bool(v),
+        Token::Operation('-') => {
+            let inner = parse_expression(input)?;
+            let inner = Box::new(inner);
+            Expression::UnaryOperator {
+                op: UnaryOperator::Neg,
+                expr: inner,
+            }
+        }
+        Token::Operation('!') => {
+            let inner = parse_expression(input)?;
+            let inner = Box::new(inner);
+            Expression::UnaryOperator {
+                op: UnaryOperator::Not,
+                expr: inner,
+            }
+        }
         Token::Paren('(') => {
             let inner = parse_expression(input)?;
             input.expect(Token::Paren(')'))?;
