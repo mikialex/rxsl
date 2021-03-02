@@ -13,8 +13,8 @@ use crate::{
 // => - EXP
 // => ! EXP
 // => ( EXP )
-// => EXP.ident
-// => EXP [EXP]
+// => EXP.ident..
+// => EXP [EXP]..
 // => number
 // => bool
 // => ident
@@ -40,9 +40,12 @@ use crate::{
 // => * / %
 
 // EXP_WITH_POSTFIX
-// => EXP_SINGLE [EXP_SINGLE]
-// => EXP_SINGLE.ident
+// => EXP_SINGLE POSTFIX..?
 // => EXP_SINGLE
+
+// POSTFIX
+// => [EXP_SINGLE]
+// => .ident
 
 // EXP_SINGLE
 // => ( EXP )
