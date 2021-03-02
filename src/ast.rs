@@ -22,6 +22,14 @@ pub enum Expression {
         right: Box<Self>,
     },
     FunctionCall(FunctionCall),
+    ArrayAccess {
+        array: Box<Self>,
+        index: Box<Self>,
+    },
+    ItemAccess {
+        from: Box<Self>,
+        to: Ident,
+    },
     Number {},
     Bool(bool),
     Ident(Ident),

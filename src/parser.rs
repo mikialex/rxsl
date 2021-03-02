@@ -9,12 +9,19 @@ use crate::{
 // => EXP + EXP
 // => EXP - EXP
 // => EXP % EXP
+// => EXP POSTFIX
 // => - EXP
+// => ! EXP
 // => ( EXP )
+// => EXP.ident
+// => EXP [EXP]
 // => number
 // => bool
 // => ident
 // => FUNCTION_CALL
+
+// FUNCTION_CALL
+// => ident( EXP.. )
 
 // ============
 // after disambiguity and remove left recursion
@@ -27,14 +34,20 @@ use crate::{
 //  => + -
 
 // EXP_NO_ADDICTIVE
-// => EXP_SINGLE MULTIPLICATIVE_OP? EXP_SINGLE?
+// => EXP_WITH_POSTFIX MULTIPLICATIVE_OP? EXP_WITH_POSTFIX?
 
 // MULTIPLICATIVE_OP
 // => * / %
 
+// EXP_WITH_POSTFIX
+// => EXP_SINGLE [EXP_SINGLE]
+// => EXP_SINGLE.ident
+// => EXP_SINGLE
+
 // EXP_SINGLE
 // => ( EXP )
 // => - EXP
+// => ! EXP
 // => number
 // => bool
 
@@ -58,10 +71,41 @@ pub fn parse_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, ParseEr
                     Token::Operation('%') => Some(BinaryOperator::Mod),
                     _ => None,
                 },
-                |lexer| parse_single_expression(lexer),
+                |lexer| parse_exp_with_postfix(lexer),
             )
         },
     )
+}
+
+// EXP_WITH_POSTFIX
+pub fn parse_exp_with_postfix<'a>(input: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {
+    let main = parse_single_expression(input)?;
+    let r = match input.peek().0 {
+        Token::Paren('[') => {
+            let _ = input.next();
+            let index = parse_single_expression(input)?;
+            input.expect(Token::Paren(']'))?;
+            Expression::ArrayAccess {
+                array: Box::new(main),
+                index: Box::new(index),
+            }
+        }
+        Token::Separator('.') => match input.next().0 {
+            Token::Word(ident) => {
+                let _ = input.next();
+                Expression::ItemAccess {
+                    from: Box::new(main),
+                    to: Ident {
+                        name: ident.to_owned(),
+                    },
+                }
+            }
+            _ => return Err(ParseError::Any("only ident can dot to")),
+        },
+        _ => return Ok(main),
+    };
+
+    Ok(r)
 }
 
 // EXP_SINGLE

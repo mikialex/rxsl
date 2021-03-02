@@ -19,4 +19,10 @@ fn parse_expression_test() {
     parse("(1+ -1)*  (- 3 / 4)");
     parse("(1+ -1)*  (- test / ddd )");
     parse("(1+ -1)*  (- test(1, 2, 1/5, mu) / ddd )");
+
+    parse("test[1]");
+
+    parse("test2[1]/2");
+
+    parse("test2[1][3]"); // todo
 }
