@@ -4,57 +4,6 @@ use crate::{
 };
 
 // EXP
-// => EXP * EXP
-// => EXP / EXP
-// => EXP + EXP
-// => EXP - EXP
-// => EXP % EXP
-// => EXP POSTFIX
-// => - EXP
-// => ! EXP
-// => ( EXP )
-// => EXP.ident..
-// => EXP [EXP]..
-// => number
-// => bool
-// => ident
-// => FUNCTION_CALL
-
-// FUNCTION_CALL
-// => ident( EXP.. )
-
-// ============
-// after disambiguity and remove left recursion
-// ============
-
-// EXP
-// => EXP_NO_ADDICTIVE ADDICTIVE_OP? EXP_NO_ADDICTIVE?
-
-// ADDICTIVE_OP
-//  => + -
-
-// EXP_NO_ADDICTIVE
-// => EXP_WITH_POSTFIX MULTIPLICATIVE_OP? EXP_WITH_POSTFIX?
-
-// MULTIPLICATIVE_OP
-// => * / %
-
-// EXP_WITH_POSTFIX
-// => EXP_SINGLE POSTFIX..?
-// => EXP_SINGLE
-
-// POSTFIX
-// => [EXP_SINGLE]
-// => .ident
-
-// EXP_SINGLE
-// => ( EXP )
-// => - EXP
-// => ! EXP
-// => number
-// => bool
-
-// EXP
 pub fn parse_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {
     // additive_expression
     parse_binary_op(
@@ -82,33 +31,35 @@ pub fn parse_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, ParseEr
 
 // EXP_WITH_POSTFIX
 pub fn parse_exp_with_postfix<'a>(input: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {
-    let main = parse_single_expression(input)?;
-    let r = match input.peek().0 {
-        Token::Paren('[') => {
-            let _ = input.next();
-            let index = parse_single_expression(input)?;
-            input.expect(Token::Paren(']'))?;
-            Expression::ArrayAccess {
-                array: Box::new(main),
-                index: Box::new(index),
-            }
-        }
-        Token::Separator('.') => match input.next().0 {
-            Token::Word(ident) => {
+    let mut result = parse_single_expression(input)?;
+    loop {
+        result = match input.peek().0 {
+            Token::Paren('[') => {
                 let _ = input.next();
-                Expression::ItemAccess {
-                    from: Box::new(main),
-                    to: Ident {
-                        name: ident.to_owned(),
-                    },
+                let index = parse_single_expression(input)?;
+                input.expect(Token::Paren(']'))?;
+                Expression::ArrayAccess {
+                    array: Box::new(result),
+                    index: Box::new(index),
                 }
             }
-            _ => return Err(ParseError::Any("only ident can dot to")),
-        },
-        _ => return Ok(main),
-    };
+            Token::Separator('.') => {
+                let _ = input.next();
+                match input.next().0 {
+                    Token::Word(ident) => Expression::ItemAccess {
+                        from: Box::new(result),
+                        to: Ident {
+                            name: ident.to_owned(),
+                        },
+                    },
+                    _ => return Err(ParseError::Any("only ident can dot with")),
+                }
+            }
+            _ => break,
+        };
+    }
 
-    Ok(r)
+    Ok(result)
 }
 
 // EXP_SINGLE

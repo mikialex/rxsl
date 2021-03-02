@@ -1,6 +1,7 @@
 use crate::{ast::Expression, lexer::Lexer, parser::parse_expression};
 
-// "cargo test -- --nocapture" can print log in unit test
+// cargo test -- --nocapture
+// can print log in unit test
 pub fn parse(input: &str) -> Expression {
     let r = parse_expression(&mut Lexer::new(input)).unwrap();
     println!("{:?}", r);
@@ -21,8 +22,7 @@ fn parse_expression_test() {
     parse("(1+ -1)*  (- test(1, 2, 1/5, mu) / ddd )");
 
     parse("test[1]");
-
     parse("test2[1]/2");
-
-    parse("test2[1][3]"); // todo
+    parse("test2.ui");
+    parse("test3[1][3].xyz");
 }
