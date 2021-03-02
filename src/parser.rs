@@ -1,5 +1,3 @@
-use std::todo;
-
 use crate::{
     ast::{BinaryOperator, Expression, FunctionCall, Ident, ParseError, UnaryOperator},
     lexer::{Lexer, Token},
@@ -15,6 +13,8 @@ use crate::{
 // => ( EXP )
 // => number
 // => bool
+// => ident
+// => FUNCTION_CALL
 
 // ============
 // after disambiguity and remove left recursion
@@ -90,6 +90,15 @@ pub fn parse_single_expression<'a>(input: &mut Lexer<'a>) -> Result<Expression, 
             input.expect(Token::Paren(')'))?;
             inner
         }
+        Token::Word(name) => {
+            if let Token::Paren('(') = input.peek().0 {
+                Expression::FunctionCall(parse_function_parameters(input, name)?)
+            } else {
+                Expression::Ident(Ident {
+                    name: name.to_owned(),
+                })
+            }
+        }
         _ => return Err(ParseError::Any("failed in parse single expression")),
     };
     Ok(r)
@@ -113,31 +122,26 @@ fn parse_binary_op<'a>(
     Ok(left)
 }
 
-// pub fn parse_function_call<'a>(input: &mut Lexer<'a>) -> Result<FunctionCall, ParseError<'a>> {
-//     let r = match input.next().0 {
-//         Token::Word(name) => {
-//             input.expect(Token::Separator('('))?;
-//             let mut arguments = Vec::new();
-//             // if skipped means empty argument
-//             if !input.if_skip(Token::Paren(')')) {
-//                 loop {
-//                     let arg = parse_expression(input)?;
-//                     arguments.push(arg);
-//                     match input.next() {
-//                         (Token::Paren(')'), _) => break,
-//                         (Token::Separator(','), _) => (),
-//                         other => {
-//                             return Err(ParseError::Unexpected(other, "argument list separator"))
-//                         }
-//                     }
-//                 }
-//             }
-//             FunctionCall {
-//                 name: name.to_owned(),
-//                 arguments,
-//             }
-//         }
-//         _ => return Err(ParseError::Any("function call")),
-//     };
-//     Ok(r)
-// }
+pub fn parse_function_parameters<'a>(
+    input: &mut Lexer<'a>,
+    name: &'a str,
+) -> Result<FunctionCall, ParseError<'a>> {
+    input.expect(Token::Paren('('))?;
+    let mut arguments = Vec::new();
+    // if skipped means empty argument
+    if !input.if_skip(Token::Paren(')')) {
+        loop {
+            let arg = parse_expression(input)?;
+            arguments.push(arg);
+            match input.next() {
+                (Token::Paren(')'), _) => break,
+                (Token::Separator(','), _) => (),
+                other => return Err(ParseError::Unexpected(other, "argument list separator")),
+            }
+        }
+    }
+    Ok(FunctionCall {
+        name: name.to_owned(),
+        arguments,
+    })
+}

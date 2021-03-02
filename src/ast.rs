@@ -10,6 +10,7 @@ pub enum ParseError<'a> {
     Unexpected(TokenSpan<'a>, &'a str),
 }
 
+#[derive(Debug)]
 pub enum Expression {
     UnaryOperator {
         op: UnaryOperator,
@@ -26,20 +27,24 @@ pub enum Expression {
     Ident(Ident),
 }
 
+#[derive(Debug)]
 pub struct FunctionCall {
     pub name: String,
     pub arguments: Vec<Expression>,
 }
 
+#[derive(Debug)]
 pub struct Ident {
     pub name: String,
 }
 
+#[derive(Debug)]
 pub enum UnaryOperator {
     Neg,
     Not,
 }
 
+#[derive(Debug)]
 pub enum BinaryOperator {
     Add,
     Sub,
@@ -48,6 +53,7 @@ pub enum BinaryOperator {
     Mod,
 }
 
+#[derive(Debug)]
 pub enum Keyword {
     If,
     Else,
