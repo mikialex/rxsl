@@ -11,6 +11,30 @@ pub enum ParseError<'a> {
 }
 
 #[derive(Debug)]
+pub struct Block {
+    pub statements: Vec<Statement>,
+}
+
+pub struct If {
+    pub condition: Expression,
+    pub accept: Block,
+    pub elses: Vec<IfElse>,
+    pub reject: Option<Block>,
+}
+
+pub struct IfElse {
+    pub condition: Expression,
+    pub accept: Block,
+}
+
+#[derive(Debug)]
+pub enum Statement {
+    Block(Block),
+    Return { value: Option<Expression> },
+    If,
+}
+
+#[derive(Debug)]
 pub enum Expression {
     UnaryOperator {
         op: UnaryOperator,

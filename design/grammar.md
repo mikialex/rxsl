@@ -1,3 +1,5 @@
+expression
+
 ```
 EXP
 => EXP * EXP
@@ -49,4 +51,27 @@ EXP_SINGLE
 => ! EXP
 => number
 => bool
+```
+
+statement & block
+
+```
+BlOCK
+=> { STATEMENT? }
+
+
+STATEMENT
+=> return EXP;
+=> IF;
+
+IF
+=> if EXP BLOCK ELSEIF? ELSE?
+
+ELSEIF
+=> else if BlOCK
+
+ELSE
+=> else BLOCK
+
+
 ```
