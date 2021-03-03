@@ -179,40 +179,89 @@ pub fn parse_single_expression<'a>(input: &mut Lexer<'a>) -> Result<Expression, 
     Ok(r)
 }
 
+// fn parse_binary_op_left<'a>(
+//     lexer: &mut Lexer<'a>,
+//     separator: impl Fn(Token<'a>) -> Option<BinaryOperator>,
+//     mut parser: impl FnMut(&mut Lexer<'a>) -> Result<Expression, ParseError<'a>>,
+// ) -> Result<Expression, ParseError<'a>> {
+//     let mut left = parser(lexer)?;
+//     while let Some(op) = separator(lexer.peek().0) {
+//         let _ = lexer.next();
+//         let expression = Expression::BinaryOperator {
+//             op,
+//             left: Box::new(left),
+//             right: Box::new(parser(lexer)?),
+//         };
+//         left = expression;
+//     }
+//     Ok(left)
+// }
+
 fn parse_binary_op_left<'a>(
     lexer: &mut Lexer<'a>,
     separator: impl Fn(Token<'a>) -> Option<BinaryOperator>,
-    mut parser: impl FnMut(&mut Lexer<'a>) -> Result<Expression, ParseError<'a>>,
+    parser: impl Fn(&mut Lexer<'a>) -> Result<Expression, ParseError<'a>>,
 ) -> Result<Expression, ParseError<'a>> {
-    let mut left = parser(lexer)?;
-    while let Some(op) = separator(lexer.peek().0) {
-        let _ = lexer.next();
-        let expression = Expression::BinaryOperator {
-            op,
+    parse_binary_like_left(
+        lexer,
+        |tk| separator(tk).is_some(),
+        &parser,
+        &parser,
+        |left, tk, right| Expression::BinaryOperator {
+            op: separator(tk).unwrap(), // this unwrap is safe
             left: Box::new(left),
-            right: Box::new(parser(lexer)?),
-        };
-        left = expression;
-    }
-    Ok(left)
+            right: Box::new(right),
+        },
+    )
 }
 
-fn _parse_binary_op_right<'a>(
+fn parse_binary_like_left<'a, L, R>(
     lexer: &mut Lexer<'a>,
-    separator: impl Fn(Token<'a>) -> Option<BinaryOperator>,
-    mut parser: impl FnMut(&mut Lexer<'a>) -> Result<Expression, ParseError<'a>>,
-) -> Result<Expression, ParseError<'a>> {
-    let mut left = parser(lexer)?;
-    if let Some(op) = separator(lexer.peek().0) {
-        let _ = lexer.next();
-        let expression = Expression::BinaryOperator {
-            op,
-            left: Box::new(left),
-            right: Box::new(_parse_binary_op_right(lexer, separator, parser)?),
-        };
-        left = expression;
+    separator: impl Fn(Token<'a>) -> bool,
+    left_parser: &impl Fn(&mut Lexer<'a>) -> Result<L, ParseError<'a>>,
+    right_parser: &impl Fn(&mut Lexer<'a>) -> Result<R, ParseError<'a>>,
+    assemble: impl Fn(L, Token<'a>, R) -> L,
+) -> Result<L, ParseError<'a>> {
+    let mut result = left_parser(lexer)?;
+    while separator(lexer.peek().0) {
+        let token = lexer.next().0;
+        let right = right_parser(lexer)?;
+        result = assemble(result, token, right);
     }
-    Ok(left)
+    Ok(result)
+}
+
+// fn parse_assignment_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {
+//     // parse_binary_like_right(lexer,
+//     //     |tk|{
+//     //         Token::Operation('=')
+//     //     }),
+//     //     |lexer| {
+//     //         match lexer.peek().0 {
+//     //             Token::Word(ident) => {
+//     //                 Ok(Ident {
+//     //                 name: ident.to_owned(),
+//     //             })
+//     //             },
+//     //             _ => Err(ParseError::<>)
+//     //         }
+//     //     }
+// }
+
+fn parse_binary_like_right<'a, L, R>(
+    lexer: &mut Lexer<'a>,
+    separator: &impl Fn(Token<'a>) -> bool,
+    left_parser: &impl Fn(&mut Lexer<'a>) -> Result<L, ParseError<'a>>,
+    right_parser: &impl Fn(&mut Lexer<'a>) -> Result<R, ParseError<'a>>,
+    assemble: &impl Fn(L, Token<'a>, R) -> R,
+) -> Result<R, ParseError<'a>> {
+    let mut left = left_parser(lexer)?;
+    if separator(lexer.peek().0) {
+        let token = lexer.next().0;
+        parse_binary_like_right(lexer, separator, left_parser, right_parser, assemble)
+    } else {
+        right_parser(lexer)
+    }
 }
 
 pub fn parse_function_parameters<'a>(
