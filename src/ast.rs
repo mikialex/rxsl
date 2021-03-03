@@ -63,6 +63,10 @@ pub enum Expression {
         from: Box<Self>,
         to: Ident,
     },
+    Assign {
+        left: Ident,
+        right: Box<Self>,
+    },
     Number {},
     Bool(bool),
     Ident(Ident),

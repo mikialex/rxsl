@@ -42,12 +42,12 @@ pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseErro
                 });
             }
 
-            let reject = if lexer.if_skip(Token::Word("else")) {
+            let reject = if lexer.skip(Token::Word("else")) {
                 Some(parse_block(lexer)?)
             } else {
                 None
             };
-            lexer.if_skip(Token::Separator(';'));
+            lexer.skip(Token::Separator(';'));
             Statement::If(If {
                 condition,
                 accept,
@@ -66,28 +66,44 @@ pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseErro
 
 // EXP
 pub fn parse_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {
-    // additive_expression
-    parse_binary_op(
-        lexer,
-        |token| match token {
-            Token::Operation('+') => Some(BinaryOperator::Add),
-            Token::Operation('-') => Some(BinaryOperator::Sub),
-            _ => None,
-        },
-        // multiplicative_expression
-        |lexer| {
-            parse_binary_op(
-                lexer,
-                |token| match token {
-                    Token::Operation('*') => Some(BinaryOperator::Mul),
-                    Token::Operation('/') => Some(BinaryOperator::Div),
-                    Token::Operation('%') => Some(BinaryOperator::Mod),
-                    _ => None,
+    let parser = |lexer: &mut Lexer<'a>| {
+        // additive_expression
+        parse_binary_op_left(
+            lexer,
+            |token| match token {
+                Token::Operation('+') => Some(BinaryOperator::Add),
+                Token::Operation('-') => Some(BinaryOperator::Sub),
+                _ => None,
+            },
+            // multiplicative_expression
+            |lexer| {
+                parse_binary_op_left(
+                    lexer,
+                    |token| match token {
+                        Token::Operation('*') => Some(BinaryOperator::Mul),
+                        Token::Operation('/') => Some(BinaryOperator::Div),
+                        Token::Operation('%') => Some(BinaryOperator::Mod),
+                        _ => None,
+                    },
+                    |lexer| parse_exp_with_postfix(lexer),
+                )
+            },
+        )
+    };
+
+    let mut l = lexer.clone();
+    if let Token::Word(ident) = l.next().0 {
+        if let Token::Operation('=') = l.next().0 {
+            return Ok(Expression::Assign {
+                left: Ident {
+                    name: ident.to_owned(),
                 },
-                |lexer| parse_exp_with_postfix(lexer),
-            )
-        },
-    )
+                right: Box::new(parser(&mut l)?),
+            });
+        }
+    }
+
+    parser(lexer)
 }
 
 // EXP_WITH_POSTFIX
@@ -163,7 +179,7 @@ pub fn parse_single_expression<'a>(input: &mut Lexer<'a>) -> Result<Expression, 
     Ok(r)
 }
 
-fn parse_binary_op<'a>(
+fn parse_binary_op_left<'a>(
     lexer: &mut Lexer<'a>,
     separator: impl Fn(Token<'a>) -> Option<BinaryOperator>,
     mut parser: impl FnMut(&mut Lexer<'a>) -> Result<Expression, ParseError<'a>>,
@@ -181,6 +197,24 @@ fn parse_binary_op<'a>(
     Ok(left)
 }
 
+fn _parse_binary_op_right<'a>(
+    lexer: &mut Lexer<'a>,
+    separator: impl Fn(Token<'a>) -> Option<BinaryOperator>,
+    mut parser: impl FnMut(&mut Lexer<'a>) -> Result<Expression, ParseError<'a>>,
+) -> Result<Expression, ParseError<'a>> {
+    let mut left = parser(lexer)?;
+    if let Some(op) = separator(lexer.peek().0) {
+        let _ = lexer.next();
+        let expression = Expression::BinaryOperator {
+            op,
+            left: Box::new(left),
+            right: Box::new(_parse_binary_op_right(lexer, separator, parser)?),
+        };
+        left = expression;
+    }
+    Ok(left)
+}
+
 pub fn parse_function_parameters<'a>(
     input: &mut Lexer<'a>,
     name: &'a str,
@@ -188,7 +222,7 @@ pub fn parse_function_parameters<'a>(
     input.expect(Token::Paren('('))?;
     let mut arguments = Vec::new();
     // if skipped means empty argument
-    if !input.if_skip(Token::Paren(')')) {
+    if !input.skip(Token::Paren(')')) {
         loop {
             let arg = parse_expression(input)?;
             arguments.push(arg);

@@ -2,7 +2,7 @@ expression
 
 ```
 EXP
-=> EXP = EXP
+=> ident = EXP
 => EXP * EXP
 => EXP / EXP
 => EXP + EXP
@@ -27,6 +27,7 @@ after disambiguity and remove left recursion
 ============
 
 EXP
+=> ident = EXP
 => EXP_NO_ASSIGN =? EXP_NO_ASSIGN?
 
 EXP_NO_ASSIGN

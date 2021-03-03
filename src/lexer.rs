@@ -112,7 +112,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn if_skip(&mut self, what: Token<'_>) -> bool {
+    pub fn skip(&mut self, what: Token<'_>) -> bool {
         let (peeked_token, rest) = self.peek_token_and_rest();
         if peeked_token.0 == what {
             self.input = rest;
