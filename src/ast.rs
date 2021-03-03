@@ -15,6 +15,7 @@ pub struct Block {
     pub statements: Vec<Statement>,
 }
 
+#[derive(Debug)]
 pub struct If {
     pub condition: Expression,
     pub accept: Block,
@@ -22,6 +23,7 @@ pub struct If {
     pub reject: Option<Block>,
 }
 
+#[derive(Debug)]
 pub struct IfElse {
     pub condition: Expression,
     pub accept: Block,
@@ -31,7 +33,7 @@ pub struct IfElse {
 pub enum Statement {
     Block(Block),
     Return { value: Option<Expression> },
-    If,
+    If(If),
 }
 
 #[derive(Debug)]

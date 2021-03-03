@@ -1,7 +1,64 @@
 use crate::{
-    ast::{BinaryOperator, Expression, FunctionCall, Ident, ParseError, UnaryOperator},
+    ast::{
+        BinaryOperator, Block, Expression, FunctionCall, Ident, If, IfElse, ParseError, Statement,
+        UnaryOperator,
+    },
     lexer::{Lexer, Token},
 };
+
+pub fn parse_block<'a>(lexer: &mut Lexer<'a>) -> Result<Block, ParseError<'a>> {
+    let mut block = Block {
+        statements: Vec::new(),
+    };
+    lexer.expect(Token::Paren('{'))?;
+    while lexer.peek().0 != Token::Paren('}') {
+        block.statements.push(parse_statement(lexer)?);
+    }
+    lexer.expect(Token::Paren('}'))?;
+    Ok(block)
+}
+
+pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseError<'a>> {
+    let r = match lexer.next().0 {
+        Token::Word("return") => {
+            let value = if lexer.peek().0 == Token::Separator(';') {
+                None
+            } else {
+                Some(parse_expression(lexer)?)
+            };
+            lexer.expect(Token::Separator(';'))?;
+            Statement::Return { value }
+        }
+        Token::Word("if") => {
+            let condition = parse_expression(lexer)?;
+            let accept = parse_block(lexer)?;
+            let mut elses = Vec::new();
+
+            while lexer.peek().0 == Token::Word("elseif") {
+                lexer.expect(Token::Word("elseif"))?;
+                elses.push(IfElse {
+                    condition: parse_expression(lexer)?,
+                    accept: parse_block(lexer)?,
+                });
+            }
+
+            let reject = if lexer.if_skip(Token::Word("else")) {
+                Some(parse_block(lexer)?)
+            } else {
+                None
+            };
+            lexer.if_skip(Token::Separator(';'));
+            Statement::If(If {
+                condition,
+                accept,
+                elses,
+                reject,
+            })
+        }
+        _ => return Err(ParseError::Any("cant parse statement")),
+    };
+    Ok(r)
+}
 
 // EXP
 pub fn parse_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {

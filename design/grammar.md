@@ -61,14 +61,14 @@ BlOCK
 
 
 STATEMENT
-=> return EXP;
+=> return EXP? ;
 => IF;
 
 IF
-=> if EXP BLOCK ELSEIF? ELSE?
+=> if EXP BLOCK ELSEIF? ELSE? ;?
 
 ELSEIF
-=> else if BlOCK
+=> elseif BlOCK
 
 ELSE
 => else BLOCK
