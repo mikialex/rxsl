@@ -66,44 +66,60 @@ pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseErro
 
 // EXP
 pub fn parse_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {
-    let parser = |lexer: &mut Lexer<'a>| {
-        // additive_expression
-        parse_binary_op_left(
-            lexer,
-            |token| match token {
-                Token::Operation('+') => Some(BinaryOperator::Add),
-                Token::Operation('-') => Some(BinaryOperator::Sub),
-                _ => None,
-            },
-            // multiplicative_expression
-            |lexer| {
-                parse_binary_op_left(
-                    lexer,
-                    |token| match token {
-                        Token::Operation('*') => Some(BinaryOperator::Mul),
-                        Token::Operation('/') => Some(BinaryOperator::Div),
-                        Token::Operation('%') => Some(BinaryOperator::Mod),
-                        _ => None,
-                    },
-                    |lexer| parse_exp_with_postfix(lexer),
-                )
-            },
-        )
-    };
-
     let mut l = lexer.clone();
-    if let Token::Word(ident) = l.next().0 {
+    if let Token::Word(_) = l.next().0 {
         if let Token::Operation('=') = l.next().0 {
-            return Ok(Expression::Assign {
-                left: Ident {
-                    name: ident.to_owned(),
-                },
-                right: Box::new(parser(&mut l)?),
-            });
+            return parse_assignment_expression(lexer);
         }
     }
 
-    parser(lexer)
+    parse_exp_with_binary_operators(lexer)
+}
+
+fn parse_assignment_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {
+    parse_binary_like_right(
+        lexer,
+        &|tk| tk == Token::Operation('='),
+        &|lexer| match lexer.next().0 {
+            Token::Word(ident) => Ok(Ident {
+                name: ident.to_owned(),
+            }),
+            _ => panic!(),
+            // _ => Err(ParseError::Any("assignment left should only be ident")),
+        },
+        &|lexer| parse_exp_with_binary_operators(lexer),
+        &|left, _, right| Expression::Assign {
+            left,
+            right: Box::new(right),
+        },
+    )
+}
+
+pub fn parse_exp_with_binary_operators<'a>(
+    lexer: &mut Lexer<'a>,
+) -> Result<Expression, ParseError<'a>> {
+    // additive_expression
+    parse_binary_op_left(
+        lexer,
+        |token| match token {
+            Token::Operation('+') => Some(BinaryOperator::Add),
+            Token::Operation('-') => Some(BinaryOperator::Sub),
+            _ => None,
+        },
+        // multiplicative_expression
+        |lexer| {
+            parse_binary_op_left(
+                lexer,
+                |token| match token {
+                    Token::Operation('*') => Some(BinaryOperator::Mul),
+                    Token::Operation('/') => Some(BinaryOperator::Div),
+                    Token::Operation('%') => Some(BinaryOperator::Mod),
+                    _ => None,
+                },
+                |lexer| parse_exp_with_postfix(lexer),
+            )
+        },
+    )
 }
 
 // EXP_WITH_POSTFIX
@@ -231,23 +247,6 @@ fn parse_binary_like_left<'a, L, R>(
     Ok(result)
 }
 
-// fn parse_assignment_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {
-//     // parse_binary_like_right(lexer,
-//     //     |tk|{
-//     //         Token::Operation('=')
-//     //     }),
-//     //     |lexer| {
-//     //         match lexer.peek().0 {
-//     //             Token::Word(ident) => {
-//     //                 Ok(Ident {
-//     //                 name: ident.to_owned(),
-//     //             })
-//     //             },
-//     //             _ => Err(ParseError::<>)
-//     //         }
-//     //     }
-// }
-
 fn parse_binary_like_right<'a, L, R>(
     lexer: &mut Lexer<'a>,
     separator: &impl Fn(Token<'a>) -> bool,
@@ -255,13 +254,22 @@ fn parse_binary_like_right<'a, L, R>(
     right_parser: &impl Fn(&mut Lexer<'a>) -> Result<R, ParseError<'a>>,
     assemble: &impl Fn(L, Token<'a>, R) -> R,
 ) -> Result<R, ParseError<'a>> {
-    let mut left = left_parser(lexer)?;
-    if separator(lexer.peek().0) {
+    let mut l = lexer.clone();
+    // loop {
+    //     if separator(l.next().0) {
+    //         let left = left_parser(lexer)?;
+    //         let token = lexer.next().0;
+    //         let right = parse_binary_like_right(lexer, separator, left_parser, right_parser, assemble)?;
+    //         return Ok(assemble(left, token, right));
+    //     }
+    // }
+    while separator(l.next().0) {
+        let left = left_parser(lexer)?;
         let token = lexer.next().0;
-        parse_binary_like_right(lexer, separator, left_parser, right_parser, assemble)
-    } else {
-        right_parser(lexer)
+        let right = parse_binary_like_right(lexer, separator, left_parser, right_parser, assemble)?;
+        return Ok(assemble(left, token, right));
     }
+    right_parser(lexer)
 }
 
 pub fn parse_function_parameters<'a>(
