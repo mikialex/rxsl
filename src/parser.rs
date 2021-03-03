@@ -1,7 +1,7 @@
 use crate::{
     ast::{
         BinaryOperator, Block, Expression, FunctionCall, Ident, If, IfElse, ParseError, Statement,
-        UnaryOperator,
+        UnaryOperator, While,
     },
     lexer::{Lexer, Token},
 };
@@ -55,6 +55,10 @@ pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseErro
                 reject,
             })
         }
+        Token::Word("while") => Statement::While(While {
+            condition: parse_expression(lexer)?,
+            body: parse_block(lexer)?,
+        }),
         _ => return Err(ParseError::Any("cant parse statement")),
     };
     Ok(r)

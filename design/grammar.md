@@ -62,7 +62,10 @@ BlOCK
 
 STATEMENT
 => return EXP? ;
-=> IF;
+=> IF
+=> FOR
+=> WHILE
+
 
 IF
 => if EXP BLOCK ELSEIF? ELSE? ;?
@@ -72,6 +75,12 @@ ELSEIF
 
 ELSE
 => else BLOCK
+
+WHILE
+=> while EXP BLOCK
+
+FOR
+=> for todo
 
 
 ```

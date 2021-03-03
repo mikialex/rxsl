@@ -30,10 +30,17 @@ pub struct IfElse {
 }
 
 #[derive(Debug)]
+pub struct While {
+    pub condition: Expression,
+    pub body: Block,
+}
+
+#[derive(Debug)]
 pub enum Statement {
     Block(Block),
     Return { value: Option<Expression> },
     If(If),
+    While(While),
 }
 
 #[derive(Debug)]
