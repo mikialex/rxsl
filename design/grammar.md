@@ -2,6 +2,7 @@ expression
 
 ```
 EXP
+=> EXP = EXP
 => EXP * EXP
 => EXP / EXP
 => EXP + EXP
@@ -26,6 +27,9 @@ after disambiguity and remove left recursion
 ============
 
 EXP
+=> EXP_NO_ASSIGN =? EXP_NO_ASSIGN?
+
+EXP_NO_ASSIGN
 => EXP_NO_ADDICTIVE ADDICTIVE_OP? EXP_NO_ADDICTIVE?
 
 ADDICTIVE_OP
