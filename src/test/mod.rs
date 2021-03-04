@@ -48,8 +48,8 @@ fn test_parse_statement(input: &str) -> Statement {
 #[test]
 fn parse_st_test() {
     test_parse_statement("return 1;");
-    // test_parse_statement("{};"); // fix me
-    // test_parse_statement("{;};"); // fix me
+    test_parse_statement("{}");
+    test_parse_statement("{;}"); // fix me
     test_parse_statement("a = 2; ");
     test_parse_statement("(1+ 1); ");
     test_parse_statement(

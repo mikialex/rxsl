@@ -52,6 +52,7 @@ pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseErro
                 } else {
                     None
                 };
+
                 lexer.skip(Token::Separator(';'));
                 Statement::If(If {
                     condition,
@@ -69,6 +70,11 @@ pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseErro
             }
             _ => return Err(ParseError::Any("cant parse statement")),
         },
+        Token::Paren('{') => Statement::Block(parse_block(lexer)?),
+        Token::Separator(';') => {
+            let _ = lexer.next();
+            Statement::Empty
+        }
         _ => {
             let exp = parse_expression(lexer)?;
             lexer.expect(Token::Separator(';'))?;
