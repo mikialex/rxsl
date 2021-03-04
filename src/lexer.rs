@@ -3,6 +3,16 @@ use std::ops::Range;
 use crate::ast::ParseError;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Keyword {
+    If,
+    ElseIf,
+    Else,
+    For,
+    While,
+    Return,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Token<'a> {
     Separator(char),
     DoubleColon,
@@ -16,6 +26,7 @@ pub enum Token<'a> {
     Bool(bool),
     String(&'a str),
     Word(&'a str),
+    Keyword(Keyword),
     Operation(char),
     LogicalOperation(char),
     ShiftOperation(char),
@@ -98,6 +109,7 @@ impl<'a> Lexer<'a> {
                 Token::Number { .. } => "number",
                 Token::String(string) => string,
                 Token::Word(word) => word,
+                Token::Keyword(_) => "Keyword",
                 Token::Operation(_) => "operation",
                 Token::LogicalOperation(_) => "logical op",
                 Token::ShiftOperation(_) => "shift op",
@@ -221,6 +233,12 @@ fn consume_token(mut input: &str, generic: bool) -> (Token<'_>, &str) {
             match word {
                 "true" => (Token::Bool(true), rest),
                 "false" => (Token::Bool(false), rest),
+                "if" => (Token::Keyword(Keyword::If), rest),
+                "elseif" => (Token::Keyword(Keyword::ElseIf), rest),
+                "else" => (Token::Keyword(Keyword::Else), rest),
+                "while" => (Token::Keyword(Keyword::While), rest),
+                "for" => (Token::Keyword(Keyword::For), rest),
+                "return" => (Token::Keyword(Keyword::Return), rest),
                 _ => (Token::Word(word), rest),
             }
         }

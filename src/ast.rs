@@ -97,11 +97,3 @@ pub enum BinaryOperator {
     Div,
     Mod,
 }
-
-#[derive(Debug)]
-pub enum Keyword {
-    If,
-    Else,
-    ElseIf,
-    For,
-}

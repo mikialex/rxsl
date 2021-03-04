@@ -3,8 +3,10 @@ use crate::{
         BinaryOperator, Block, Expression, FunctionCall, Ident, If, IfElse, ParseError, Statement,
         UnaryOperator, While,
     },
-    lexer::{Lexer, Token},
+    lexer::{Keyword, Lexer, Token},
 };
+
+use Keyword::*;
 
 pub fn parse_block<'a>(lexer: &mut Lexer<'a>) -> Result<Block, ParseError<'a>> {
     let mut block = Block {
@@ -20,45 +22,48 @@ pub fn parse_block<'a>(lexer: &mut Lexer<'a>) -> Result<Block, ParseError<'a>> {
 
 pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseError<'a>> {
     let r = match lexer.next().0 {
-        Token::Word("return") => {
-            let value = if lexer.peek().0 == Token::Separator(';') {
-                None
-            } else {
-                Some(parse_expression(lexer)?)
-            };
-            lexer.expect(Token::Separator(';'))?;
-            Statement::Return { value }
-        }
-        Token::Word("if") => {
-            let condition = parse_expression(lexer)?;
-            let accept = parse_block(lexer)?;
-            let mut elses = Vec::new();
-
-            while lexer.peek().0 == Token::Word("elseif") {
-                lexer.expect(Token::Word("elseif"))?;
-                elses.push(IfElse {
-                    condition: parse_expression(lexer)?,
-                    accept: parse_block(lexer)?,
-                });
+        Token::Keyword(keyword) => match keyword {
+            Return => {
+                let value = if lexer.peek().0 == Token::Separator(';') {
+                    None
+                } else {
+                    Some(parse_expression(lexer)?)
+                };
+                lexer.expect(Token::Separator(';'))?;
+                Statement::Return { value }
             }
+            If => {
+                let condition = parse_expression(lexer)?;
+                let accept = parse_block(lexer)?;
+                let mut elses = Vec::new();
 
-            let reject = if lexer.skip(Token::Word("else")) {
-                Some(parse_block(lexer)?)
-            } else {
-                None
-            };
-            lexer.skip(Token::Separator(';'));
-            Statement::If(If {
-                condition,
-                accept,
-                elses,
-                reject,
-            })
-        }
-        Token::Word("while") => Statement::While(While {
-            condition: parse_expression(lexer)?,
-            body: parse_block(lexer)?,
-        }),
+                while lexer.peek().0 == Token::Keyword(ElseIf) {
+                    lexer.expect(Token::Keyword(ElseIf))?;
+                    elses.push(IfElse {
+                        condition: parse_expression(lexer)?,
+                        accept: parse_block(lexer)?,
+                    });
+                }
+
+                let reject = if lexer.skip(Token::Keyword(Else)) {
+                    Some(parse_block(lexer)?)
+                } else {
+                    None
+                };
+                lexer.skip(Token::Separator(';'));
+                Statement::If(If {
+                    condition,
+                    accept,
+                    elses,
+                    reject,
+                })
+            }
+            While => Statement::While(While {
+                condition: parse_expression(lexer)?,
+                body: parse_block(lexer)?,
+            }),
+            _ => return Err(ParseError::Any("cant parse statement")),
+        },
         _ => return Err(ParseError::Any("cant parse statement")),
     };
     Ok(r)
