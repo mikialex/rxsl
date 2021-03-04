@@ -28,7 +28,7 @@ pub enum Token<'a> {
 
 pub type TokenSpan<'a> = (Token<'a>, Range<usize>);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Lexer<'a> {
     input: &'a str,
     source: &'a str,

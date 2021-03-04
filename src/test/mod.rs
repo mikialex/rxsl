@@ -14,25 +14,28 @@ pub fn parse(input: &str) -> Expression {
 
 #[test]
 fn parse_expression_test() {
-    parse("a= b = 2");
-    // parse("1");
-    // parse("true");
-    // parse("!(true)");
-    // parse("1+1");
-    // parse("1+1+1");
-    // parse("1+(1)");
-    // parse("1+1*  3");
-    // parse("1+ -1*  - 3");
-    // parse("(1+ -1)*  (- 3 / 4)");
-    // parse("(1+ -1)*  (- test / ddd )");
-    // parse("(1+ -1)*  (- test(1, 2, 1/5, mu) / ddd )");
-    // parse("2 - 4 - 5");
-    // // parse("2-4-5"); fixme
+    parse("1");
+    parse("true");
+    parse("!(true)");
+    parse("1+1");
+    parse("1+1+1");
+    parse("1+(1)");
+    parse("1+1*  3");
+    parse("1+ -1*  - 3");
+    parse("(1+ -1)*  (- 3 / 4)");
+    parse("(1+ -1)*  (- test / ddd )");
+    parse("(1+ -1)*  (- test(1, 2, 1/5, mu) / ddd )");
+    parse("2 - 4 - 5");
+    // parse("2-4-5"); fixme
 
-    // parse("test[1]");
-    // parse("test2[1]/2");
-    // parse("test2.ui");
-    // parse("test3[1][3].xyz");
+    parse("test[1]");
+    parse("test2[1]/2");
+    parse("test2.ui");
+    parse("test3[1][3].xyz");
+
+    parse("a= 2");
+    parse("a= b = c= 2");
+    parse("a= b = c= 2 + 1 * 4");
 }
 
 fn test_parse_statement(input: &str) -> Statement {

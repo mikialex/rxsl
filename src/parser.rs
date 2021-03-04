@@ -84,8 +84,7 @@ fn parse_assignment_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, 
             Token::Word(ident) => Ok(Ident {
                 name: ident.to_owned(),
             }),
-            _ => panic!(),
-            // _ => Err(ParseError::Any("assignment left should only be ident")),
+            _ => Err(ParseError::Any("assignment left should only be ident")),
         },
         &|lexer| parse_exp_with_binary_operators(lexer),
         &|left, _, right| Expression::Assign {
@@ -254,22 +253,19 @@ fn parse_binary_like_right<'a, L, R>(
     right_parser: &impl Fn(&mut Lexer<'a>) -> Result<R, ParseError<'a>>,
     assemble: &impl Fn(L, Token<'a>, R) -> R,
 ) -> Result<R, ParseError<'a>> {
-    let mut l = lexer.clone();
-    // loop {
-    //     if separator(l.next().0) {
-    //         let left = left_parser(lexer)?;
-    //         let token = lexer.next().0;
-    //         let right = parse_binary_like_right(lexer, separator, left_parser, right_parser, assemble)?;
-    //         return Ok(assemble(left, token, right));
-    //     }
-    // }
-    while separator(l.next().0) {
-        let left = left_parser(lexer)?;
-        let token = lexer.next().0;
-        let right = parse_binary_like_right(lexer, separator, left_parser, right_parser, assemble)?;
-        return Ok(assemble(left, token, right));
+    let mut backup = lexer.clone();
+    let left = left_parser(lexer);
+    if let Ok(left) = left {
+        while separator(lexer.peek().0) {
+            let token = lexer.next().0;
+            let right =
+                parse_binary_like_right(lexer, separator, left_parser, right_parser, assemble)?;
+            return Ok(assemble(left, token, right));
+        }
+        right_parser(lexer)
+    } else {
+        return right_parser(&mut backup);
     }
-    right_parser(lexer)
 }
 
 pub fn parse_function_parameters<'a>(
