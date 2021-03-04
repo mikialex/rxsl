@@ -38,6 +38,7 @@ pub struct While {
 #[derive(Debug)]
 pub enum Statement {
     Block(Block),
+    Expression(Expression),
     Return { value: Option<Expression> },
     If(If),
     While(While),

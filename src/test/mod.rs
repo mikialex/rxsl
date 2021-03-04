@@ -33,6 +33,7 @@ fn parse_expression_test() {
     parse("test2.ui");
     parse("test3[1][3].xyz");
 
+    parse("a= b");
     parse("a= 2");
     parse("a= b = c= 2");
     parse("a= b = c= 2 + 1 * 4");
@@ -47,6 +48,10 @@ fn test_parse_statement(input: &str) -> Statement {
 #[test]
 fn parse_st_test() {
     test_parse_statement("return 1;");
+    // test_parse_statement("{};"); // fix me
+    // test_parse_statement("{;};"); // fix me
+    test_parse_statement("a = 2; ");
+    test_parse_statement("(1+ 1); ");
     test_parse_statement(
         "
     if 1+1 {

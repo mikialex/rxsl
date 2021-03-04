@@ -21,9 +21,10 @@ pub fn parse_block<'a>(lexer: &mut Lexer<'a>) -> Result<Block, ParseError<'a>> {
 }
 
 pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseError<'a>> {
-    let r = match lexer.next().0 {
+    let r = match lexer.peek().0 {
         Token::Keyword(keyword) => match keyword {
             Return => {
+                let _ = lexer.next();
                 let value = if lexer.peek().0 == Token::Separator(';') {
                     None
                 } else {
@@ -33,6 +34,7 @@ pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseErro
                 Statement::Return { value }
             }
             If => {
+                let _ = lexer.next();
                 let condition = parse_expression(lexer)?;
                 let accept = parse_block(lexer)?;
                 let mut elses = Vec::new();
@@ -58,13 +60,20 @@ pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseErro
                     reject,
                 })
             }
-            While => Statement::While(While {
-                condition: parse_expression(lexer)?,
-                body: parse_block(lexer)?,
-            }),
+            While => {
+                let _ = lexer.next();
+                Statement::While(While {
+                    condition: parse_expression(lexer)?,
+                    body: parse_block(lexer)?,
+                })
+            }
             _ => return Err(ParseError::Any("cant parse statement")),
         },
-        _ => return Err(ParseError::Any("cant parse statement")),
+        _ => {
+            let exp = parse_expression(lexer)?;
+            lexer.expect(Token::Separator(';'))?;
+            Statement::Expression(exp)
+        }
     };
     Ok(r)
 }
@@ -85,11 +94,16 @@ fn parse_assignment_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, 
     parse_binary_like_right(
         lexer,
         &|tk| tk == Token::Operation('='),
-        &|lexer| match lexer.next().0 {
-            Token::Word(ident) => Ok(Ident {
-                name: ident.to_owned(),
-            }),
-            _ => Err(ParseError::Any("assignment left should only be ident")),
+        &|lexer| {
+            let r = match lexer.next().0 {
+                Token::Word(ident) => Ok(Ident {
+                    name: ident.to_owned(),
+                }),
+                _ => Err(ParseError::Any("assignment left should only be ident")),
+            };
+
+            lexer.clone().expect(Token::Operation('='))?;
+            r
         },
         &|lexer| parse_exp_with_binary_operators(lexer),
         &|left, _, right| Expression::Assign {
@@ -194,28 +208,11 @@ pub fn parse_single_expression<'a>(input: &mut Lexer<'a>) -> Result<Expression, 
                 })
             }
         }
-        _ => return Err(ParseError::Any("failed in parse single expression")),
+        _ => panic!(),
+        // _ => return Err(ParseError::Any("failed in parse single expression")),
     };
     Ok(r)
 }
-
-// fn parse_binary_op_left<'a>(
-//     lexer: &mut Lexer<'a>,
-//     separator: impl Fn(Token<'a>) -> Option<BinaryOperator>,
-//     mut parser: impl FnMut(&mut Lexer<'a>) -> Result<Expression, ParseError<'a>>,
-// ) -> Result<Expression, ParseError<'a>> {
-//     let mut left = parser(lexer)?;
-//     while let Some(op) = separator(lexer.peek().0) {
-//         let _ = lexer.next();
-//         let expression = Expression::BinaryOperator {
-//             op,
-//             left: Box::new(left),
-//             right: Box::new(parser(lexer)?),
-//         };
-//         left = expression;
-//     }
-//     Ok(left)
-// }
 
 fn parse_binary_op_left<'a>(
     lexer: &mut Lexer<'a>,
