@@ -11,6 +11,14 @@ pub enum ParseError<'a> {
 }
 
 #[derive(Debug)]
+pub struct FunctionDefine {
+    pub name: Ident,
+    pub parameters: Vec<(Ident, TypeExpression)>,
+    pub return_type: TypeExpression,
+    pub body: Block,
+}
+
+#[derive(Debug)]
 pub struct Block {
     pub statements: Vec<Statement>,
 }
@@ -43,6 +51,16 @@ pub enum Statement {
     Return { value: Option<Expression> },
     If(If),
     While(While),
+}
+
+#[derive(Debug)]
+pub enum TypeExpression {
+    Named(Ident),
+    // should we support this(generics) now?
+    // Constructor {
+    //     name: Ident,
+    //     parameters: Vec<Box<TypeExpression>>,
+    // },
 }
 
 #[derive(Debug)]
