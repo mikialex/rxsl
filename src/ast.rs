@@ -1,9 +1,5 @@
 use crate::lexer::TokenSpan;
 
-pub enum ASTNode {
-    Expression,
-}
-
 #[derive(Debug)]
 pub enum ParseError<'a> {
     Any(&'static str),
@@ -13,8 +9,8 @@ pub enum ParseError<'a> {
 #[derive(Debug)]
 pub struct FunctionDefine {
     pub name: Ident,
-    pub parameters: Vec<(Ident, TypeExpression)>,
-    pub return_type: TypeExpression,
+    pub arguments: Vec<(Ident, TypeExpression)>,
+    pub return_type: Option<TypeExpression>,
     pub body: Block,
 }
 

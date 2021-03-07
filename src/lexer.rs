@@ -10,6 +10,7 @@ pub enum Keyword {
     For,
     While,
     Return,
+    Function,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -239,6 +240,7 @@ fn consume_token(mut input: &str, generic: bool) -> (Token<'_>, &str) {
                 "while" => (Token::Keyword(Keyword::While), rest),
                 "for" => (Token::Keyword(Keyword::For), rest),
                 "return" => (Token::Keyword(Keyword::Return), rest),
+                "fn" => (Token::Keyword(Keyword::Function), rest),
                 _ => (Token::Word(word), rest),
             }
         }
