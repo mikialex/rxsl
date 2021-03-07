@@ -98,4 +98,10 @@ pub enum BinaryOperator {
     Mul,
     Div,
     Mod,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
+    Equal,
+    NotEqual,
 }

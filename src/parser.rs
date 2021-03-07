@@ -122,25 +122,49 @@ fn parse_assignment_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, 
 pub fn parse_exp_with_binary_operators<'a>(
     lexer: &mut Lexer<'a>,
 ) -> Result<Expression, ParseError<'a>> {
-    // additive_expression
+    // equality_expression
     parse_binary_op_left(
         lexer,
         |token| match token {
-            Token::Operation('+') => Some(BinaryOperator::Add),
-            Token::Operation('-') => Some(BinaryOperator::Sub),
+            Token::LogicalOperation('=') => Some(BinaryOperator::Equal),
+            Token::LogicalOperation('!') => Some(BinaryOperator::NotEqual),
             _ => None,
         },
-        // multiplicative_expression
+        // relational_expression
         |lexer| {
             parse_binary_op_left(
                 lexer,
                 |token| match token {
-                    Token::Operation('*') => Some(BinaryOperator::Mul),
-                    Token::Operation('/') => Some(BinaryOperator::Div),
-                    Token::Operation('%') => Some(BinaryOperator::Mod),
+                    Token::Paren('<') => Some(BinaryOperator::Less),
+                    Token::Paren('>') => Some(BinaryOperator::Greater),
+                    Token::LogicalOperation('<') => Some(BinaryOperator::LessEqual),
+                    Token::LogicalOperation('>') => Some(BinaryOperator::GreaterEqual),
                     _ => None,
                 },
-                |lexer| parse_exp_with_postfix(lexer),
+                |lexer| {
+                    // additive_expression
+                    parse_binary_op_left(
+                        lexer,
+                        |token| match token {
+                            Token::Operation('+') => Some(BinaryOperator::Add),
+                            Token::Operation('-') => Some(BinaryOperator::Sub),
+                            _ => None,
+                        },
+                        // multiplicative_expression
+                        |lexer| {
+                            parse_binary_op_left(
+                                lexer,
+                                |token| match token {
+                                    Token::Operation('*') => Some(BinaryOperator::Mul),
+                                    Token::Operation('/') => Some(BinaryOperator::Div),
+                                    Token::Operation('%') => Some(BinaryOperator::Mod),
+                                    _ => None,
+                                },
+                                |lexer| parse_exp_with_postfix(lexer),
+                            )
+                        },
+                    )
+                },
             )
         },
     )
