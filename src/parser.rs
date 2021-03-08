@@ -1,12 +1,65 @@
 use crate::{
     ast::{
-        BinaryOperator, Block, Expression, FunctionCall, Ident, If, IfElse, ParseError, Statement,
-        UnaryOperator, While,
+        BinaryOperator, Block, Expression, FunctionCall, FunctionDefine, Ident, If, IfElse,
+        ParseError, Statement, TypeExpression, UnaryOperator, While,
     },
     lexer::{Keyword, Lexer, Token},
 };
 
 use Keyword::*;
+
+pub fn parse_function_define<'a>(input: &mut Lexer<'a>) -> Result<FunctionDefine, ParseError<'a>> {
+    input.expect(Token::Keyword(Function))?;
+
+    let name = parse_ident(input)?;
+    input.expect(Token::Paren('('))?;
+    let mut arguments = Vec::new();
+    if !input.skip(Token::Paren(')')) {
+        loop {
+            let name = parse_ident(input)?;
+            let arg = parse_type_expression(input)?;
+            arguments.push((name, arg));
+            match input.next() {
+                (Token::Paren(')'), _) => break,
+                (Token::Separator(','), _) => (),
+                other => return Err(ParseError::Unexpected(other, "argument list separator")),
+            }
+        }
+    };
+    let return_type = if input.skip(Token::Arrow) {
+        Some(parse_type_expression(input)?)
+    } else {
+        None
+    };
+
+    let body = parse_block(input)?;
+    Ok(FunctionDefine {
+        name,
+        arguments,
+        return_type,
+        body,
+    })
+}
+
+fn parse_ident<'a>(lexer: &mut Lexer<'a>) -> Result<Ident, ParseError<'a>> {
+    let r = match lexer.next().0 {
+        Token::Word(name) => Ident {
+            name: name.to_owned(),
+        },
+        _ => return Err(ParseError::Any("cant parse ident")),
+    };
+    Ok(r)
+}
+
+pub fn parse_type_expression<'a>(lexer: &mut Lexer<'a>) -> Result<TypeExpression, ParseError<'a>> {
+    let r = match lexer.next().0 {
+        Token::Word(name) => TypeExpression::Named(Ident {
+            name: name.to_owned(),
+        }),
+        _ => return Err(ParseError::Any("cant parse type_expression")),
+    };
+    Ok(r)
+}
 
 pub fn parse_block<'a>(lexer: &mut Lexer<'a>) -> Result<Block, ParseError<'a>> {
     let mut block = Block {
@@ -163,25 +216,49 @@ fn parse_assignment_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, 
 pub fn parse_exp_with_binary_operators<'a>(
     lexer: &mut Lexer<'a>,
 ) -> Result<Expression, ParseError<'a>> {
-    // additive_expression
+    // equality_expression
     parse_binary_op_left(
         lexer,
         |token| match token {
-            Token::Operation('+') => Some(BinaryOperator::Add),
-            Token::Operation('-') => Some(BinaryOperator::Sub),
+            Token::LogicalOperation('=') => Some(BinaryOperator::Equal),
+            Token::LogicalOperation('!') => Some(BinaryOperator::NotEqual),
             _ => None,
         },
-        // multiplicative_expression
+        // relational_expression
         |lexer| {
             parse_binary_op_left(
                 lexer,
                 |token| match token {
-                    Token::Operation('*') => Some(BinaryOperator::Mul),
-                    Token::Operation('/') => Some(BinaryOperator::Div),
-                    Token::Operation('%') => Some(BinaryOperator::Mod),
+                    Token::Paren('<') => Some(BinaryOperator::Less),
+                    Token::Paren('>') => Some(BinaryOperator::Greater),
+                    Token::LogicalOperation('<') => Some(BinaryOperator::LessEqual),
+                    Token::LogicalOperation('>') => Some(BinaryOperator::GreaterEqual),
                     _ => None,
                 },
-                |lexer| parse_exp_with_postfix(lexer),
+                |lexer| {
+                    // additive_expression
+                    parse_binary_op_left(
+                        lexer,
+                        |token| match token {
+                            Token::Operation('+') => Some(BinaryOperator::Add),
+                            Token::Operation('-') => Some(BinaryOperator::Sub),
+                            _ => None,
+                        },
+                        // multiplicative_expression
+                        |lexer| {
+                            parse_binary_op_left(
+                                lexer,
+                                |token| match token {
+                                    Token::Operation('*') => Some(BinaryOperator::Mul),
+                                    Token::Operation('/') => Some(BinaryOperator::Div),
+                                    Token::Operation('%') => Some(BinaryOperator::Mod),
+                                    _ => None,
+                                },
+                                |lexer| parse_exp_with_postfix(lexer),
+                            )
+                        },
+                    )
+                },
             )
         },
     )

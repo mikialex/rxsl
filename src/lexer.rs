@@ -11,6 +11,7 @@ pub enum Keyword {
     While,
     Return,
     Declare(DeclarationType),
+    Function,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -245,6 +246,7 @@ fn consume_token(mut input: &str, generic: bool) -> (Token<'_>, &str) {
                     Token::Keyword(Keyword::Declare(DeclarationType::Const)),
                     rest,
                 ),
+                "fn" => (Token::Keyword(Keyword::Function), rest),
                 _ => (Token::Word(word), rest),
             }
         }

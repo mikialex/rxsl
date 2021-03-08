@@ -27,6 +27,8 @@ fn parse_expression_test() {
     parse("(1+ -1)*  (- test(1, 2, 1/5, mu) / ddd )");
     parse("2 - 4 - 5");
     // parse("2-4-5"); fixme
+    parse(" 1 < 2");
+    parse(" 1 < 2 == 2");
 
     parse("test[1]");
     parse("test2[1]/2");

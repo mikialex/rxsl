@@ -1,13 +1,17 @@
 use crate::lexer::TokenSpan;
 
-pub enum ASTNode {
-    Expression,
-}
-
 #[derive(Debug)]
 pub enum ParseError<'a> {
     Any(&'static str),
     Unexpected(TokenSpan<'a>, &'a str),
+}
+
+#[derive(Debug)]
+pub struct FunctionDefine {
+    pub name: Ident,
+    pub arguments: Vec<(Ident, TypeExpression)>,
+    pub return_type: Option<TypeExpression>,
+    pub body: Block,
 }
 
 #[derive(Debug)]
@@ -68,6 +72,16 @@ pub enum DeclarationType {
 }
 
 #[derive(Debug)]
+pub enum TypeExpression {
+    Named(Ident),
+    // should we support this(generics) now?
+    // Constructor {
+    //     name: Ident,
+    //     parameters: Vec<Box<TypeExpression>>,
+    // },
+}
+
+#[derive(Debug)]
 pub enum Expression {
     UnaryOperator {
         op: UnaryOperator,
@@ -120,4 +134,10 @@ pub enum BinaryOperator {
     Mul,
     Div,
     Mod,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
+    Equal,
+    NotEqual,
 }
