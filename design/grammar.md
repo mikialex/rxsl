@@ -67,11 +67,16 @@ BlOCK
 
 STATEMENT
 => BLOCK
-=> EXP? ;
 => return EXP? ;
 => IF
 => FOR
 => WHILE
+
+STATEMENT_EXPRESSION_LIKE
+=> ;
+=> EXP? ;
+=> DECLARE ident = EXP;
+
 
 
 IF
@@ -87,7 +92,7 @@ WHILE
 => while EXP BLOCK
 
 FOR
-=> for todo
+=> for STATEMENT_EXPRESSION_LIKE STATEMENT_EXPRESSION_LIKE EXPRESSION BLOCK
 
 
 ```

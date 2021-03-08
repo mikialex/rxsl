@@ -36,13 +36,35 @@ pub struct While {
 }
 
 #[derive(Debug)]
+pub struct For {
+    pub init: Box<Statement>,
+    pub test: Box<Statement>,
+    pub update: Expression,
+    pub body: Block,
+}
+
+#[derive(Debug)]
 pub enum Statement {
     Block(Block),
+    Declare {
+        ty: DeclarationType,
+        name: Ident,
+        init: Option<Expression>,
+    },
     Empty,
     Expression(Expression),
-    Return { value: Option<Expression> },
+    Return {
+        value: Option<Expression>,
+    },
     If(If),
     While(While),
+    For(For),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DeclarationType {
+    Let,
+    Const,
 }
 
 #[derive(Debug)]

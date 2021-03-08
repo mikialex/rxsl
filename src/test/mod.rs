@@ -52,6 +52,8 @@ fn parse_st_test() {
     test_parse_statement("{;}"); // fix me
     test_parse_statement("a = 2; ");
     test_parse_statement("(1+ 1); ");
+    test_parse_statement("let a = (1+ 1); ");
+    test_parse_statement("const a = b = (1+ 1); ");
     test_parse_statement(
         "
     if 1+1 {
@@ -64,6 +66,14 @@ fn parse_st_test() {
         return x;
     }
 
+    ",
+    );
+
+    test_parse_statement(
+        "
+        for let i = 0; false; false   {
+            print();
+        }
     ",
     );
 }

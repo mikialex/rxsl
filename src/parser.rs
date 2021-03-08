@@ -23,6 +23,7 @@ pub fn parse_block<'a>(lexer: &mut Lexer<'a>) -> Result<Block, ParseError<'a>> {
 pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseError<'a>> {
     let r = match lexer.peek().0 {
         Token::Keyword(keyword) => match keyword {
+            Declare(_) => parse_expression_like_statement(lexer)?,
             Return => {
                 let _ = lexer.next();
                 let value = if lexer.peek().0 == Token::Separator(';') {
@@ -61,6 +62,19 @@ pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseErro
                     reject,
                 })
             }
+            For => {
+                let _ = lexer.next();
+                let init = parse_expression_like_statement(lexer)?;
+                let test = parse_expression_like_statement(lexer)?;
+                let update = parse_expression(lexer)?;
+                let body = parse_block(lexer)?;
+                Statement::For(crate::ast::For {
+                    init: Box::new(init),
+                    test: Box::new(test),
+                    update,
+                    body,
+                })
+            }
             While => {
                 let _ = lexer.next();
                 Statement::While(While {
@@ -71,6 +85,33 @@ pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseErro
             _ => return Err(ParseError::Any("cant parse statement")),
         },
         Token::Paren('{') => Statement::Block(parse_block(lexer)?),
+        _ => parse_expression_like_statement(lexer)?,
+    };
+    Ok(r)
+}
+
+pub fn parse_expression_like_statement<'a>(
+    lexer: &mut Lexer<'a>,
+) -> Result<Statement, ParseError<'a>> {
+    let r = match lexer.peek().0 {
+        Token::Keyword(keyword) => match keyword {
+            Declare(ty) => {
+                let _ = lexer.next();
+                let exp = parse_expression(lexer)?;
+                if let Expression::Assign { left, right } = exp {
+                    let r = Statement::Declare {
+                        ty,
+                        name: left,
+                        init: (*right).into(),
+                    };
+                    lexer.expect(Token::Separator(';'))?;
+                    r
+                } else {
+                    return Err(ParseError::Any("cant parse simple declare statement"));
+                }
+            }
+            _ => return Err(ParseError::Any("cant parse simple statement")),
+        },
         Token::Separator(';') => {
             let _ = lexer.next();
             Statement::Empty

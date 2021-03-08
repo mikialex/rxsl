@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::ast::ParseError;
+use crate::ast::{DeclarationType, ParseError};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Keyword {
@@ -10,6 +10,7 @@ pub enum Keyword {
     For,
     While,
     Return,
+    Declare(DeclarationType),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -239,6 +240,11 @@ fn consume_token(mut input: &str, generic: bool) -> (Token<'_>, &str) {
                 "while" => (Token::Keyword(Keyword::While), rest),
                 "for" => (Token::Keyword(Keyword::For), rest),
                 "return" => (Token::Keyword(Keyword::Return), rest),
+                "let" => (Token::Keyword(Keyword::Declare(DeclarationType::Let)), rest),
+                "const" => (
+                    Token::Keyword(Keyword::Declare(DeclarationType::Const)),
+                    rest,
+                ),
                 _ => (Token::Word(word), rest),
             }
         }
