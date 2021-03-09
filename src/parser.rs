@@ -1,44 +1,46 @@
 use crate::{
     ast::{
         BinaryOperator, Block, Expression, FunctionCall, FunctionDefine, Ident, If, IfElse,
-        ParseError, Statement, TypeExpression, UnaryOperator, While,
+        ParseError, Statement, SyntaxElement, TypeExpression, UnaryOperator, While,
     },
     lexer::{Keyword, Lexer, Token},
 };
 
 use Keyword::*;
 
-pub fn parse_function_define<'a>(input: &mut Lexer<'a>) -> Result<FunctionDefine, ParseError<'a>> {
-    input.expect(Token::Keyword(Function))?;
+impl SyntaxElement for FunctionDefine {
+    fn parse<'a>(input: &mut Lexer<'a>) -> Result<Self, ParseError<'a>> {
+        input.expect(Token::Keyword(Function))?;
 
-    let name = parse_ident(input)?;
-    input.expect(Token::Paren('('))?;
-    let mut arguments = Vec::new();
-    if !input.skip(Token::Paren(')')) {
-        loop {
-            let name = parse_ident(input)?;
-            let arg = parse_type_expression(input)?;
-            arguments.push((name, arg));
-            match input.next() {
-                (Token::Paren(')'), _) => break,
-                (Token::Separator(','), _) => (),
-                other => return Err(ParseError::Unexpected(other, "argument list separator")),
+        let name = parse_ident(input)?;
+        input.expect(Token::Paren('('))?;
+        let mut arguments = Vec::new();
+        if !input.skip(Token::Paren(')')) {
+            loop {
+                let name = parse_ident(input)?;
+                let arg = TypeExpression::parse(input)?;
+                arguments.push((name, arg));
+                match input.next() {
+                    (Token::Paren(')'), _) => break,
+                    (Token::Separator(','), _) => (),
+                    other => return Err(ParseError::Unexpected(other, "argument list separator")),
+                }
             }
-        }
-    };
-    let return_type = if input.skip(Token::Arrow) {
-        Some(parse_type_expression(input)?)
-    } else {
-        None
-    };
+        };
+        let return_type = if input.skip(Token::Arrow) {
+            Some(TypeExpression::parse(input)?)
+        } else {
+            None
+        };
 
-    let body = parse_block(input)?;
-    Ok(FunctionDefine {
-        name,
-        arguments,
-        return_type,
-        body,
-    })
+        let body = Block::parse(input)?;
+        Ok(FunctionDefine {
+            name,
+            arguments,
+            return_type,
+            body,
+        })
+    }
 }
 
 fn parse_ident<'a>(lexer: &mut Lexer<'a>) -> Result<Ident, ParseError<'a>> {
@@ -51,96 +53,102 @@ fn parse_ident<'a>(lexer: &mut Lexer<'a>) -> Result<Ident, ParseError<'a>> {
     Ok(r)
 }
 
-pub fn parse_type_expression<'a>(lexer: &mut Lexer<'a>) -> Result<TypeExpression, ParseError<'a>> {
-    let r = match lexer.next().0 {
-        Token::Word(name) => TypeExpression::Named(Ident {
-            name: name.to_owned(),
-        }),
-        _ => return Err(ParseError::Any("cant parse type_expression")),
-    };
-    Ok(r)
-}
-
-pub fn parse_block<'a>(lexer: &mut Lexer<'a>) -> Result<Block, ParseError<'a>> {
-    let mut block = Block {
-        statements: Vec::new(),
-    };
-    lexer.expect(Token::Paren('{'))?;
-    while lexer.peek().0 != Token::Paren('}') {
-        block.statements.push(parse_statement(lexer)?);
+impl SyntaxElement for TypeExpression {
+    fn parse<'a>(lexer: &mut Lexer<'a>) -> Result<Self, ParseError<'a>> {
+        let r = match lexer.next().0 {
+            Token::Word(name) => TypeExpression::Named(Ident {
+                name: name.to_owned(),
+            }),
+            _ => return Err(ParseError::Any("cant parse type_expression")),
+        };
+        Ok(r)
     }
-    lexer.expect(Token::Paren('}'))?;
-    Ok(block)
 }
 
-pub fn parse_statement<'a>(lexer: &mut Lexer<'a>) -> Result<Statement, ParseError<'a>> {
-    let r = match lexer.peek().0 {
-        Token::Keyword(keyword) => match keyword {
-            Declare(_) => parse_expression_like_statement(lexer)?,
-            Return => {
-                let _ = lexer.next();
-                let value = if lexer.peek().0 == Token::Separator(';') {
-                    None
-                } else {
-                    Some(parse_expression(lexer)?)
-                };
-                lexer.expect(Token::Separator(';'))?;
-                Statement::Return { value }
-            }
-            If => {
-                let _ = lexer.next();
-                let condition = parse_expression(lexer)?;
-                let accept = parse_block(lexer)?;
-                let mut elses = Vec::new();
+impl SyntaxElement for Block {
+    fn parse<'a>(lexer: &mut Lexer<'a>) -> Result<Self, ParseError<'a>> {
+        let mut block = Block {
+            statements: Vec::new(),
+        };
+        lexer.expect(Token::Paren('{'))?;
+        while lexer.peek().0 != Token::Paren('}') {
+            block.statements.push(Statement::parse(lexer)?);
+        }
+        lexer.expect(Token::Paren('}'))?;
+        Ok(block)
+    }
+}
 
-                while lexer.peek().0 == Token::Keyword(ElseIf) {
-                    lexer.expect(Token::Keyword(ElseIf))?;
-                    elses.push(IfElse {
-                        condition: parse_expression(lexer)?,
-                        accept: parse_block(lexer)?,
-                    });
+impl SyntaxElement for Statement {
+    fn parse<'a>(lexer: &mut Lexer<'a>) -> Result<Self, ParseError<'a>> {
+        let r = match lexer.peek().0 {
+            Token::Keyword(keyword) => match keyword {
+                Declare(_) => parse_expression_like_statement(lexer)?,
+                Return => {
+                    let _ = lexer.next();
+                    let value = if lexer.peek().0 == Token::Separator(';') {
+                        None
+                    } else {
+                        Some(Expression::parse(lexer)?)
+                    };
+                    lexer.expect(Token::Separator(';'))?;
+                    Statement::Return { value }
                 }
+                If => {
+                    let _ = lexer.next();
+                    let condition = Expression::parse(lexer)?;
+                    let accept = Block::parse(lexer)?;
+                    let mut elses = Vec::new();
 
-                let reject = if lexer.skip(Token::Keyword(Else)) {
-                    Some(parse_block(lexer)?)
-                } else {
-                    None
-                };
+                    while lexer.peek().0 == Token::Keyword(ElseIf) {
+                        lexer.expect(Token::Keyword(ElseIf))?;
+                        elses.push(IfElse {
+                            condition: Expression::parse(lexer)?,
+                            accept: Block::parse(lexer)?,
+                        });
+                    }
 
-                lexer.skip(Token::Separator(';'));
-                Statement::If(If {
-                    condition,
-                    accept,
-                    elses,
-                    reject,
-                })
-            }
-            For => {
-                let _ = lexer.next();
-                let init = parse_expression_like_statement(lexer)?;
-                let test = parse_expression_like_statement(lexer)?;
-                let update = parse_expression(lexer)?;
-                let body = parse_block(lexer)?;
-                Statement::For(crate::ast::For {
-                    init: Box::new(init),
-                    test: Box::new(test),
-                    update,
-                    body,
-                })
-            }
-            While => {
-                let _ = lexer.next();
-                Statement::While(While {
-                    condition: parse_expression(lexer)?,
-                    body: parse_block(lexer)?,
-                })
-            }
-            _ => return Err(ParseError::Any("cant parse statement")),
-        },
-        Token::Paren('{') => Statement::Block(parse_block(lexer)?),
-        _ => parse_expression_like_statement(lexer)?,
-    };
-    Ok(r)
+                    let reject = if lexer.skip(Token::Keyword(Else)) {
+                        Some(Block::parse(lexer)?)
+                    } else {
+                        None
+                    };
+
+                    lexer.skip(Token::Separator(';'));
+                    Statement::If(If {
+                        condition,
+                        accept,
+                        elses,
+                        reject,
+                    })
+                }
+                For => {
+                    let _ = lexer.next();
+                    let init = parse_expression_like_statement(lexer)?;
+                    let test = parse_expression_like_statement(lexer)?;
+                    let update = Expression::parse(lexer)?;
+                    let body = Block::parse(lexer)?;
+                    Statement::For(crate::ast::For {
+                        init: Box::new(init),
+                        test: Box::new(test),
+                        update,
+                        body,
+                    })
+                }
+                While => {
+                    let _ = lexer.next();
+                    Statement::While(While {
+                        condition: Expression::parse(lexer)?,
+                        body: Block::parse(lexer)?,
+                    })
+                }
+                _ => return Err(ParseError::Any("cant parse statement")),
+            },
+            Token::Paren('{') => Statement::Block(Block::parse(lexer)?),
+            _ => parse_expression_like_statement(lexer)?,
+        };
+        Ok(r)
+    }
 }
 
 pub fn parse_expression_like_statement<'a>(
@@ -150,7 +158,7 @@ pub fn parse_expression_like_statement<'a>(
         Token::Keyword(keyword) => match keyword {
             Declare(ty) => {
                 let _ = lexer.next();
-                let exp = parse_expression(lexer)?;
+                let exp = Expression::parse(lexer)?;
                 if let Expression::Assign { left, right } = exp {
                     let r = Statement::Declare {
                         ty,
@@ -170,7 +178,7 @@ pub fn parse_expression_like_statement<'a>(
             Statement::Empty
         }
         _ => {
-            let exp = parse_expression(lexer)?;
+            let exp = Expression::parse(lexer)?;
             lexer.expect(Token::Separator(';'))?;
             Statement::Expression(exp)
         }
@@ -179,15 +187,18 @@ pub fn parse_expression_like_statement<'a>(
 }
 
 // EXP
-pub fn parse_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {
-    let mut l = lexer.clone();
-    if let Token::Word(_) = l.next().0 {
-        if let Token::Operation('=') = l.next().0 {
-            return parse_assignment_expression(lexer);
-        }
-    }
 
-    parse_exp_with_binary_operators(lexer)
+impl SyntaxElement for Expression {
+    fn parse<'a>(lexer: &mut Lexer<'a>) -> Result<Self, ParseError<'a>> {
+        let mut l = lexer.clone();
+        if let Token::Word(_) = l.next().0 {
+            if let Token::Operation('=') = l.next().0 {
+                return parse_assignment_expression(lexer);
+            }
+        }
+
+        parse_exp_with_binary_operators(lexer)
+    }
 }
 
 fn parse_assignment_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {
@@ -303,7 +314,7 @@ pub fn parse_single_expression<'a>(input: &mut Lexer<'a>) -> Result<Expression, 
         Token::Number { .. } => Expression::Number {},
         Token::Bool(v) => Expression::Bool(v),
         Token::Operation('-') => {
-            let inner = parse_expression(input)?;
+            let inner = Expression::parse(input)?;
             let inner = Box::new(inner);
             Expression::UnaryOperator {
                 op: UnaryOperator::Neg,
@@ -311,7 +322,7 @@ pub fn parse_single_expression<'a>(input: &mut Lexer<'a>) -> Result<Expression, 
             }
         }
         Token::Operation('!') => {
-            let inner = parse_expression(input)?;
+            let inner = Expression::parse(input)?;
             let inner = Box::new(inner);
             Expression::UnaryOperator {
                 op: UnaryOperator::Not,
@@ -319,7 +330,7 @@ pub fn parse_single_expression<'a>(input: &mut Lexer<'a>) -> Result<Expression, 
             }
         }
         Token::Paren('(') => {
-            let inner = parse_expression(input)?;
+            let inner = Expression::parse(input)?;
             input.expect(Token::Paren(')'))?;
             inner
         }
@@ -403,7 +414,7 @@ pub fn parse_function_parameters<'a>(
     // if skipped means empty argument
     if !input.skip(Token::Paren(')')) {
         loop {
-            let arg = parse_expression(input)?;
+            let arg = Expression::parse(input)?;
             arguments.push(arg);
             match input.next() {
                 (Token::Paren(')'), _) => break,

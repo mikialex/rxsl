@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expression, Statement},
+    ast::{Expression, Statement, SyntaxElement},
     lexer::Lexer,
     parser::*,
 };
@@ -7,7 +7,7 @@ use crate::{
 // cargo test -- --nocapture
 // can print log in unit test, but have some order issue
 pub fn parse(input: &str) -> Expression {
-    let r = parse_expression(&mut Lexer::new(input)).unwrap();
+    let r = Expression::parse(&mut Lexer::new(input)).unwrap();
     println!("{:?}", r);
     r
 }
@@ -42,7 +42,7 @@ fn parse_expression_test() {
 }
 
 fn test_parse_statement(input: &str) -> Statement {
-    let r = parse_statement(&mut Lexer::new(input)).unwrap();
+    let r = Statement::parse(&mut Lexer::new(input)).unwrap();
     println!("{:?}", r);
     r
 }
