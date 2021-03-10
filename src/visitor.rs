@@ -1,4 +1,6 @@
-use crate::ast::{Block, Expression, FunctionCall, FunctionDefine, Ident, Statement};
+use crate::ast::{
+    Block, Expression, FunctionCall, FunctionDefine, Ident, Statement, TypeExpression,
+};
 
 pub trait Visitor<T, E> {
     fn visit(&mut self, _item: &T) -> Result<NextVisit, E>;
@@ -32,6 +34,14 @@ impl<T, E> SyntaxTreeVisitable<T, E> for FunctionDefine {
         self.name.visit_by(visitor)?;
         // self.arguments.iter().for_each(|ar| ar);
         self.body.visit_by(visitor)
+    }
+}
+
+impl<T, E> SyntaxTreeVisitable<T, E> for TypeExpression {
+    fn visit_children_by(&self, visitor: &mut T) -> Result<(), E> {
+        match self {
+            TypeExpression::Named(ident) => ident.visit_by(visitor),
+        }
     }
 }
 
