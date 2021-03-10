@@ -1,3 +1,5 @@
+#![feature(min_specialization)]
+
 pub mod ast;
 pub mod lexer;
 pub mod parser;
