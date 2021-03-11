@@ -3,23 +3,52 @@ use crate::ast::{
 };
 
 pub trait Visitor<T, E> {
-    fn visit(&mut self, _item: &T) -> Result<NextVisit, E>;
+    fn visit(&mut self, item: &T) -> Result<(), E>;
 }
+
+impl<X, T, E> Visitor<X, E> for T {
+    default fn visit(&mut self, _item: &X) -> Result<(), E> {
+        Ok(())
+    }
+}
+
+pub trait SyntaxTreeVisitable<T, E>: Sized {
+    fn visit_by(&self, visitor: &mut T) -> Result<(), E> {
+        visitor.visit(self)
+    }
+}
+
+impl<T, E> SyntaxTreeVisitable<T, E> for FunctionDefine {}
+impl<T, E> SyntaxTreeVisitable<T, E> for TypeExpression {}
+impl<T, E> SyntaxTreeVisitable<T, E> for Ident {}
+impl<T, E> SyntaxTreeVisitable<T, E> for Statement {}
+impl<T, E> SyntaxTreeVisitable<T, E> for Block {}
+impl<T, E> SyntaxTreeVisitable<T, E> for FunctionCall {}
+impl<T, E> SyntaxTreeVisitable<T, E> for Expression {}
+
+////////
 
 pub enum NextVisit {
     Continue,
     SkipChildren,
 }
 
-impl<X, T, E> Visitor<X, E> for T {
-    default fn visit(&mut self, _item: &X) -> Result<NextVisit, E> {
+pub struct ASTTreeTraverseVisitor<T> {
+    visitor: T,
+}
+pub trait ASTTreeTraverseVisitorTrait<T, E> {
+    fn traverse_visit(&mut self, _item: &T) -> Result<NextVisit, E>;
+}
+
+impl<X, T, E> ASTTreeTraverseVisitorTrait<X, E> for T {
+    default fn traverse_visit(&mut self, _item: &X) -> Result<NextVisit, E> {
         Ok(NextVisit::Continue)
     }
 }
 
-pub trait SyntaxTreeVisitable<T, E>: Sized {
-    fn visit_by(&self, visitor: &mut T) -> Result<(), E> {
-        match visitor.visit(self)? {
+pub trait ASTTreeTraverseVisitable<T, E>: Sized {
+    fn traverse_visit_by(&self, visitor: &mut T) -> Result<(), E> {
+        match visitor.traverse_visit(self)? {
             NextVisit::Continue => self.visit_children_by(visitor),
             NextVisit::SkipChildren => Ok(()),
         }
@@ -29,61 +58,61 @@ pub trait SyntaxTreeVisitable<T, E>: Sized {
     }
 }
 
-impl<T, E> SyntaxTreeVisitable<T, E> for FunctionDefine {
+impl<T, E> ASTTreeTraverseVisitable<T, E> for FunctionDefine {
     fn visit_children_by(&self, visitor: &mut T) -> Result<(), E> {
-        self.name.visit_by(visitor)?;
+        self.name.traverse_visit_by(visitor)?;
         // self.arguments.iter().for_each(|ar| ar);
-        self.body.visit_by(visitor)
+        self.body.traverse_visit_by(visitor)
     }
 }
 
-impl<T, E> SyntaxTreeVisitable<T, E> for TypeExpression {
+impl<T, E> ASTTreeTraverseVisitable<T, E> for TypeExpression {
     fn visit_children_by(&self, visitor: &mut T) -> Result<(), E> {
         match self {
-            TypeExpression::Named(ident) => ident.visit_by(visitor),
+            TypeExpression::Named(ident) => ident.traverse_visit_by(visitor),
         }
     }
 }
 
-impl<T, E> SyntaxTreeVisitable<T, E> for Ident {}
-impl<T, E> SyntaxTreeVisitable<T, E> for Statement {
+impl<T, E> ASTTreeTraverseVisitable<T, E> for Ident {}
+impl<T, E> ASTTreeTraverseVisitable<T, E> for Statement {
     fn visit_children_by(&self, visitor: &mut T) -> Result<(), E> {
         todo!()
     }
 }
 
-impl<T, E> SyntaxTreeVisitable<T, E> for Block {
+impl<T, E> ASTTreeTraverseVisitable<T, E> for Block {
     fn visit_children_by(&self, visitor: &mut T) -> Result<(), E> {
         todo!()
     }
 }
 
-impl<T, E> SyntaxTreeVisitable<T, E> for FunctionCall {
+impl<T, E> ASTTreeTraverseVisitable<T, E> for FunctionCall {
     fn visit_children_by(&self, visitor: &mut T) -> Result<(), E> {
         todo!()
     }
 }
 
-impl<T, E> SyntaxTreeVisitable<T, E> for Expression {
+impl<T, E> ASTTreeTraverseVisitable<T, E> for Expression {
     fn visit_children_by(&self, visitor: &mut T) -> Result<(), E> {
         match self {
-            Expression::UnaryOperator { expr, .. } => expr.visit_by(visitor),
+            Expression::UnaryOperator { expr, .. } => expr.traverse_visit_by(visitor),
             Expression::BinaryOperator { left, right, .. } => {
-                left.visit_by(visitor)?;
-                right.visit_by(visitor)
+                left.traverse_visit_by(visitor)?;
+                right.traverse_visit_by(visitor)
             }
-            Expression::FunctionCall(f) => f.visit_by(visitor),
+            Expression::FunctionCall(f) => f.traverse_visit_by(visitor),
             Expression::ArrayAccess { array, index } => {
-                array.visit_by(visitor)?;
-                index.visit_by(visitor)
+                array.traverse_visit_by(visitor)?;
+                index.traverse_visit_by(visitor)
             }
             Expression::ItemAccess { from, to } => {
-                from.visit_by(visitor)?;
-                to.visit_by(visitor)
+                from.traverse_visit_by(visitor)?;
+                to.traverse_visit_by(visitor)
             }
             Expression::Assign { left, right } => {
-                left.visit_by(visitor)?;
-                right.visit_by(visitor)
+                left.traverse_visit_by(visitor)?;
+                right.traverse_visit_by(visitor)
             }
             Expression::Number {} => todo!(),
             Expression::Bool(_) => todo!(),
