@@ -2,29 +2,29 @@ use crate::ast::{
     Block, Expression, FunctionCall, FunctionDefine, Ident, Statement, TypeExpression,
 };
 
-pub trait Visitor<T, E> {
-    fn visit(&mut self, item: &T) -> Result<(), E>;
+pub trait Visitor<T, R, E> {
+    fn visit(&mut self, item: &T) -> Result<R, E>;
 }
 
-impl<X, T, E> Visitor<X, E> for T {
+impl<X, T, E> Visitor<X, (), E> for T {
     default fn visit(&mut self, _item: &X) -> Result<(), E> {
         Ok(())
     }
 }
 
-pub trait SyntaxTreeVisitable<T, E>: Sized {
-    fn visit_by(&self, visitor: &mut T) -> Result<(), E> {
+pub trait SyntaxTreeVisitable<T: Visitor<Self, R, E>, R, E>: Sized {
+    fn visit_by(&self, visitor: &mut T) -> Result<R, E> {
         visitor.visit(self)
     }
 }
 
-impl<T, E> SyntaxTreeVisitable<T, E> for FunctionDefine {}
-impl<T, E> SyntaxTreeVisitable<T, E> for TypeExpression {}
-impl<T, E> SyntaxTreeVisitable<T, E> for Ident {}
-impl<T, E> SyntaxTreeVisitable<T, E> for Statement {}
-impl<T, E> SyntaxTreeVisitable<T, E> for Block {}
-impl<T, E> SyntaxTreeVisitable<T, E> for FunctionCall {}
-impl<T, E> SyntaxTreeVisitable<T, E> for Expression {}
+impl<T: Visitor<Self, R, E>, R, E> SyntaxTreeVisitable<T, R, E> for FunctionDefine {}
+impl<T: Visitor<Self, R, E>, R, E> SyntaxTreeVisitable<T, R, E> for TypeExpression {}
+impl<T: Visitor<Self, R, E>, R, E> SyntaxTreeVisitable<T, R, E> for Ident {}
+impl<T: Visitor<Self, R, E>, R, E> SyntaxTreeVisitable<T, R, E> for Statement {}
+impl<T: Visitor<Self, R, E>, R, E> SyntaxTreeVisitable<T, R, E> for Block {}
+impl<T: Visitor<Self, R, E>, R, E> SyntaxTreeVisitable<T, R, E> for FunctionCall {}
+impl<T: Visitor<Self, R, E>, R, E> SyntaxTreeVisitable<T, R, E> for Expression {}
 
 ////////
 
