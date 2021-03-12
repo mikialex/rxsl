@@ -13,6 +13,11 @@ pub enum IRInstruction {
     Copy {
         source: IRInstructionAddress,
     },
+    Goto(usize),
+    IfTrueGoto {
+        prediction: IRInstructionAddress,
+        target: usize,
+    },
 }
 
 impl IRInstruction {
@@ -63,11 +68,18 @@ impl std::fmt::Display for InstructionList {
                     self.format_arg(right)
                 ),
                 IRInstruction::Unary { op, target } => {
-                    write!(f, "t{} = {} {}", index, op, self.format_arg(target))
+                    write!(f, "t{} = {} {}\n", index, op, self.format_arg(target))
                 }
                 IRInstruction::Copy { source } => {
-                    write!(f, "t{} = {}", index, self.format_arg(source))
+                    write!(f, "t{} = {}\n", index, self.format_arg(source))
                 }
+                IRInstruction::Goto(target) => write!(f, "goto line {}\n", target),
+                IRInstruction::IfTrueGoto { prediction, target } => write!(
+                    f,
+                    "if {} goto line {}\n",
+                    self.format_arg(prediction),
+                    target
+                ),
             };
         });
         Ok(())
