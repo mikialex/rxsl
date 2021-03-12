@@ -31,6 +31,9 @@ impl IRInstruction {
     ) -> Self {
         Self::Binary { op, left, right }
     }
+    pub fn if_true_goto(prediction: IRInstructionAddress, target: usize) -> Self {
+        Self::IfTrueGoto { prediction, target }
+    }
 }
 
 pub enum IRInstructionAddress {
@@ -51,6 +54,10 @@ impl InstructionList {
             IRInstructionAddress::Symbol(symbol) => format!("{}", symbol),
             IRInstructionAddress::Const() => format!("const"),
         }
+    }
+
+    fn instruction_count(&self) -> usize {
+        self.instructions.len()
     }
 }
 
@@ -164,8 +171,14 @@ impl Visitor<Statement, (), IRGenerationError> for IRGenerator {
             Statement::Empty => {}
             Statement::Expression(_) => {}
             Statement::Return { .. } => todo!(),
-            Statement::If(_) => {}
-            Statement::While(_) => {}
+            Statement::If(des) => {
+                let prediction: IRInstructionAddress = des.condition.visit_by(self)?;
+            }
+            Statement::While(des) => {
+                // let prediction_start =
+                // let prediction: IRInstructionAddress = des.condition.visit_by(self)?;
+                // let goto = IRInstruction::if_true_goto(prediction, target)
+            }
             Statement::For(_) => todo!(),
         }
         Ok(())
