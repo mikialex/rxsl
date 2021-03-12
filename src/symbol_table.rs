@@ -1,13 +1,9 @@
 use std::collections::HashMap;
 
-pub enum ValueType {
-    F32,
-    Boolean,
-    Unknown,
-}
+use crate::ir::PrimitiveType;
 
 pub struct SymbolInfo {
-    pub ty: ValueType,
+    pub ty: PrimitiveType,
 }
 
 pub struct SymbolTable {

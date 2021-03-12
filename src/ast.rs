@@ -125,13 +125,22 @@ pub struct Ident {
     pub name: String,
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum UnaryOperator {
     Neg,
     Not,
 }
 
-#[derive(Debug)]
+impl std::fmt::Display for UnaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UnaryOperator::Neg => write!(f, "-"),
+            UnaryOperator::Not => write!(f, "!"),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
 pub enum BinaryOperator {
     Add,
     Sub,
@@ -144,4 +153,22 @@ pub enum BinaryOperator {
     GreaterEqual,
     Equal,
     NotEqual,
+}
+
+impl std::fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BinaryOperator::Add => write!(f, "+"),
+            BinaryOperator::Sub => write!(f, "-"),
+            BinaryOperator::Mul => write!(f, "*"),
+            BinaryOperator::Div => write!(f, "/"),
+            BinaryOperator::Mod => write!(f, "%"),
+            BinaryOperator::Less => write!(f, "<"),
+            BinaryOperator::LessEqual => write!(f, "<="),
+            BinaryOperator::Greater => write!(f, ">"),
+            BinaryOperator::GreaterEqual => write!(f, ">="),
+            BinaryOperator::Equal => write!(f, "=="),
+            BinaryOperator::NotEqual => write!(f, "!="),
+        }
+    }
 }

@@ -23,9 +23,11 @@ pub enum ASTValidationError {
 
 pub struct TypeError(&'static str);
 
-pub struct TypeChecker {}
+pub struct TypeChecker<'a> {
+    symbol_table: &'a mut SymbolTable,
+}
 
-impl Visitor<Expression, PrimitiveType, TypeError> for TypeChecker {
+impl<'a> Visitor<Expression, PrimitiveType, TypeError> for TypeChecker<'a> {
     fn visit(&mut self, exp: &Expression) -> Result<PrimitiveType, TypeError> {
         let ty = match exp {
             Expression::UnaryOperator { op, expr } => {
@@ -46,6 +48,11 @@ impl Visitor<Expression, PrimitiveType, TypeError> for TypeChecker {
                 }
             }
             Expression::BinaryOperator { left, op, right } => {
+                let left_ty = left.visit_by(self)?;
+                let right_ty = right.visit_by(self)?;
+                if left_ty != right_ty {
+                    return Err(TypeError("type not same between binary operator"));
+                }
                 match op {
                     BinaryOperator::Add => {}
                     BinaryOperator::Sub => {}
