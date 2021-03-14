@@ -254,12 +254,8 @@ struct BooleanInstJump {
     false_tag: JumpUnresolved,
 }
 
-impl IRGenerator {
-    fn code_gen(
-        &mut self,
-        stmt: &Statement,
-        next: JumpUnresolved,
-    ) -> Result<BlockInstJump, IRGenerationError> {
+impl Visitor<Statement, BlockInstJump, IRGenerationError> for IRGenerator {
+    fn visit(&mut self, stmt: &Statement) -> Result<BlockInstJump, IRGenerationError> {
         let re = match stmt {
             Statement::Block(b) => b.visit_by(self)?,
             Statement::Declare { ty, name, init } => {
