@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::{ast::*, symbol_table::SymbolTable, visitor::*};
 
@@ -130,6 +130,45 @@ pub struct InstructionLabel {
     inner: usize,
 }
 
+pub struct InstructionLabelManager {
+    latest_label_index: usize,
+    /// map the unresolved label to instructions that referenced
+    unresolved_labels: HashMap<InstructionLabel, Vec<usize>>,
+    /// map label to actual instruction line
+    resolved_label: HashMap<InstructionLabel, usize>,
+}
+
+impl InstructionLabelManager {
+    pub fn new() -> Self {
+        Self {
+            latest_label_index: 0,
+            unresolved_labels: HashMap::new(),
+            resolved_label: HashMap::new(),
+        }
+    }
+
+    pub fn new_label(&mut self) -> InstructionLabel {
+        let ins = InstructionLabel {
+            inner: self.latest_label_index,
+        };
+        self.latest_label_index += 1;
+        self.unresolved_labels.insert(ins, Vec::new());
+        ins
+    }
+
+    pub fn back_patch(&mut self, label: InstructionLabel, ins: InstructionLabel) {
+        todo!()
+    }
+
+    pub fn merge(
+        &mut self,
+        one: InstructionLabel,
+        the_other: InstructionLabel,
+    ) -> InstructionLabel {
+        todo!()
+    }
+}
+
 impl std::fmt::Display for InstructionLabel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<LABEL:{}>", self.inner)
@@ -144,11 +183,9 @@ struct LoopCtx {}
 
 pub struct IRGenerator {
     instructions: InstructionList,
-    label_index: usize,
-    unresolved_labels: HashSet<InstructionLabel>,
+    labels: InstructionLabelManager,
     fn_ctx: Option<FunctionCtx>,
     loop_ctx: Vec<LoopCtx>,
-    label_map: HashMap<InstructionLabel, usize>,
     symbol_table: SymbolTable,
 }
 
@@ -156,34 +193,11 @@ impl IRGenerator {
     pub fn new() -> Self {
         Self {
             instructions: InstructionList::new(),
-            label_index: 0,
-            unresolved_labels: HashSet::new(),
-            label_map: HashMap::new(),
+            labels: InstructionLabelManager::new(),
             fn_ctx: None,
             loop_ctx: Vec::new(),
             symbol_table: SymbolTable::new(),
         }
-    }
-
-    pub fn new_label(&mut self) -> InstructionLabel {
-        let ins = InstructionLabel {
-            inner: self.label_index,
-        };
-        self.label_index += 1;
-        self.unresolved_labels.insert(ins);
-        ins
-    }
-
-    pub fn back_patch(&mut self, label: InstructionLabel, ins: InstructionLabel) {
-        todo!()
-    }
-
-    pub fn merge(
-        &mut self,
-        one: InstructionLabel,
-        the_other: InstructionLabel,
-    ) -> InstructionLabel {
-        todo!()
     }
 }
 
@@ -233,10 +247,10 @@ struct BooleanInstJump {
     false_tag: InstructionLabel,
 }
 
-impl Visitor<Statement, (), IRGenerationError> for IRGenerator {
-    fn visit(&mut self, stmt: &Statement) -> Result<(), IRGenerationError> {
-        let next = match stmt {
-            Statement::Block(_) => {}
+impl Visitor<Statement, BlockInstJump, IRGenerationError> for IRGenerator {
+    fn visit(&mut self, stmt: &Statement) -> Result<BlockInstJump, IRGenerationError> {
+        let re = match stmt {
+            Statement::Block(b) => b.visit_by(self)?,
             Statement::Declare { ty, name, init } => {
                 // self.symbol_table.declare(name, info);
             }
@@ -245,18 +259,23 @@ impl Visitor<Statement, (), IRGenerationError> for IRGenerator {
             Statement::Return { .. } => todo!(),
             Statement::If(des) => {
                 let prediction: IRInstructionAddress = des.condition.visit_by(self)?;
+                todo!()
             }
             Statement::While(des) => {
                 let prediction: BooleanInstJump = des.condition.visit_by(self)?;
                 let loop_body: BlockInstJump = des.body.visit_by(self)?;
-                self.back_patch(loop_body.next, prediction.ins_begin);
-                self.back_patch(prediction.true_tag, loop_body.ins_begin);
+                self.labels.back_patch(loop_body.next, prediction.ins_begin);
+                self.labels
+                    .back_patch(prediction.true_tag, loop_body.ins_begin);
                 self.instructions
                     .push(IRInstruction::Goto(prediction.ins_begin));
-                prediction.false_tag
+                BlockInstJump {
+                    ins_begin: prediction.ins_begin,
+                    next: prediction.false_tag,
+                }
             }
             Statement::For(_) => todo!(),
         };
-        Ok(())
+        Ok(re)
     }
 }
