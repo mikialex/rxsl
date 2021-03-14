@@ -57,10 +57,6 @@ impl InstructionList {
             IRInstructionAddress::Const() => format!("const"),
         }
     }
-
-    fn instruction_count(&self) -> usize {
-        self.instructions.len()
-    }
 }
 
 impl std::fmt::Display for InstructionList {
@@ -177,6 +173,18 @@ impl IRGenerator {
         self.unresolved_labels.insert(ins);
         ins
     }
+
+    pub fn back_patch(&mut self, label: InstructionLabel, ins: InstructionLabel) {
+        todo!()
+    }
+
+    pub fn merge(
+        &mut self,
+        one: InstructionLabel,
+        the_other: InstructionLabel,
+    ) -> InstructionLabel {
+        todo!()
+    }
 }
 
 impl Visitor<Expression, IRInstructionAddress, IRGenerationError> for IRGenerator {
@@ -208,15 +216,26 @@ impl Visitor<Expression, IRInstructionAddress, IRGenerationError> for IRGenerato
     }
 }
 
-struct InstructionBlock {
-    label_id: usize,
-    body: Vec<IRInstruction>,
-    // termination: Option<Instruction>,
+struct BlockInstJump {
+    ins_begin: InstructionLabel,
+    next: InstructionLabel,
+}
+
+// impl Visitor<Block, BlockInstJump, IRGenerationError> for IRGenerator {
+//     fn visit(&mut self, b: &Block) -> Result<BlockInstJump, IRGenerationError> {
+//         todo!()
+//     }
+// }
+
+struct BooleanInstJump {
+    ins_begin: InstructionLabel,
+    true_tag: InstructionLabel,
+    false_tag: InstructionLabel,
 }
 
 impl Visitor<Statement, (), IRGenerationError> for IRGenerator {
     fn visit(&mut self, stmt: &Statement) -> Result<(), IRGenerationError> {
-        match stmt {
+        let next = match stmt {
             Statement::Block(_) => {}
             Statement::Declare { ty, name, init } => {
                 // self.symbol_table.declare(name, info);
@@ -228,12 +247,16 @@ impl Visitor<Statement, (), IRGenerationError> for IRGenerator {
                 let prediction: IRInstructionAddress = des.condition.visit_by(self)?;
             }
             Statement::While(des) => {
-                // let prediction_start =
-                // let prediction: IRInstructionAddress = des.condition.visit_by(self)?;
-                // let goto = IRInstruction::if_true_goto(prediction, target)
+                let prediction: BooleanInstJump = des.condition.visit_by(self)?;
+                let loop_body: BlockInstJump = des.body.visit_by(self)?;
+                self.back_patch(loop_body.next, prediction.ins_begin);
+                self.back_patch(prediction.true_tag, loop_body.ins_begin);
+                self.instructions
+                    .push(IRInstruction::Goto(prediction.ins_begin));
+                prediction.false_tag
             }
             Statement::For(_) => todo!(),
-        }
+        };
         Ok(())
     }
 }
