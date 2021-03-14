@@ -15,11 +15,25 @@ pub enum IRInstruction {
     Copy {
         source: IRInstructionAddress,
     },
-    Goto(InstructionLabel),
+    Goto(JumpAddress),
     IfTrueGoto {
         prediction: IRInstructionAddress,
-        target: InstructionLabel,
+        target: JumpAddress,
     },
+}
+
+pub enum JumpAddress {
+    Unknown,
+    Line(usize),
+}
+
+impl std::fmt::Display for JumpAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JumpAddress::Unknown => write!(f, "UNKNOWN"),
+            JumpAddress::Line(line) => write!(f, "{}", line),
+        }
+    }
 }
 
 impl IRInstruction {
@@ -33,7 +47,7 @@ impl IRInstruction {
     ) -> Self {
         Self::Binary { op, left, right }
     }
-    pub fn if_true_goto(prediction: IRInstructionAddress, target: InstructionLabel) -> Self {
+    pub fn if_true_goto(prediction: IRInstructionAddress, target: JumpAddress) -> Self {
         Self::IfTrueGoto { prediction, target }
     }
 }
@@ -134,8 +148,6 @@ pub struct InstructionLabelManager {
     latest_label_index: usize,
     /// map the unresolved label to instructions that referenced
     unresolved_labels: HashMap<InstructionLabel, Vec<usize>>,
-    /// map label to actual instruction line
-    resolved_label: HashMap<InstructionLabel, usize>,
 }
 
 impl InstructionLabelManager {
@@ -143,20 +155,19 @@ impl InstructionLabelManager {
         Self {
             latest_label_index: 0,
             unresolved_labels: HashMap::new(),
-            resolved_label: HashMap::new(),
         }
     }
 
-    pub fn new_label(&mut self) -> InstructionLabel {
+    pub fn new_label(&mut self, ins_line: usize) -> InstructionLabel {
         let ins = InstructionLabel {
             inner: self.latest_label_index,
         };
         self.latest_label_index += 1;
-        self.unresolved_labels.insert(ins, Vec::new());
+        self.unresolved_labels.insert(ins, vec![ins_line]);
         ins
     }
 
-    pub fn back_patch(&mut self, label: InstructionLabel, ins: InstructionLabel) {
+    pub fn back_patch(&mut self, label: InstructionLabel, ins: usize) {
         todo!()
     }
 
@@ -199,6 +210,9 @@ impl IRGenerator {
             symbol_table: SymbolTable::new(),
         }
     }
+    pub fn new_label_next_inst(&mut self) -> InstructionLabel {
+        self.labels.new_label(self.instructions.instructions.len())
+    }
 }
 
 impl Visitor<Expression, IRInstructionAddress, IRGenerationError> for IRGenerator {
@@ -231,7 +245,7 @@ impl Visitor<Expression, IRInstructionAddress, IRGenerationError> for IRGenerato
 }
 
 struct BlockInstJump {
-    ins_begin: InstructionLabel,
+    ins_begin: usize,
     next: InstructionLabel,
 }
 
@@ -242,13 +256,17 @@ struct BlockInstJump {
 // }
 
 struct BooleanInstJump {
-    ins_begin: InstructionLabel,
+    ins_begin: usize,
     true_tag: InstructionLabel,
     false_tag: InstructionLabel,
 }
 
-impl Visitor<Statement, BlockInstJump, IRGenerationError> for IRGenerator {
-    fn visit(&mut self, stmt: &Statement) -> Result<BlockInstJump, IRGenerationError> {
+impl IRGenerator {
+    fn code_gen(
+        &mut self,
+        stmt: &Statement,
+        next: InstructionLabel,
+    ) -> Result<BlockInstJump, IRGenerationError> {
         let re = match stmt {
             Statement::Block(b) => b.visit_by(self)?,
             Statement::Declare { ty, name, init } => {
@@ -268,7 +286,7 @@ impl Visitor<Statement, BlockInstJump, IRGenerationError> for IRGenerator {
                 self.labels
                     .back_patch(prediction.true_tag, loop_body.ins_begin);
                 self.instructions
-                    .push(IRInstruction::Goto(prediction.ins_begin));
+                    .push(IRInstruction::Goto(JumpAddress::Line(prediction.ins_begin)));
                 BlockInstJump {
                     ins_begin: prediction.ins_begin,
                     next: prediction.false_tag,
