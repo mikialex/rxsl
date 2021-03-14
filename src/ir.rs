@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use crate::{ast::*, symbol_table::SymbolTable, visitor::*};
 
 pub enum IRInstruction {
@@ -13,10 +15,10 @@ pub enum IRInstruction {
     Copy {
         source: IRInstructionAddress,
     },
-    Goto(usize),
+    Goto(InstructionLabel),
     IfTrueGoto {
         prediction: IRInstructionAddress,
-        target: usize,
+        target: InstructionLabel,
     },
 }
 
@@ -31,7 +33,7 @@ impl IRInstruction {
     ) -> Self {
         Self::Binary { op, left, right }
     }
-    pub fn if_true_goto(prediction: IRInstructionAddress, target: usize) -> Self {
+    pub fn if_true_goto(prediction: IRInstructionAddress, target: InstructionLabel) -> Self {
         Self::IfTrueGoto { prediction, target }
     }
 }
@@ -127,9 +129,54 @@ pub enum PrimitiveType {
 
 pub struct IRGenerationError {}
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct InstructionLabel {
+    inner: usize,
+}
+
+impl std::fmt::Display for InstructionLabel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<LABEL:{}>", self.inner)
+    }
+}
+
+struct FunctionCtx {
+    return_label: InstructionLabel,
+}
+
+struct LoopCtx {}
+
 pub struct IRGenerator {
     instructions: InstructionList,
+    label_index: usize,
+    unresolved_labels: HashSet<InstructionLabel>,
+    fn_ctx: Option<FunctionCtx>,
+    loop_ctx: Vec<LoopCtx>,
+    label_map: HashMap<InstructionLabel, usize>,
     symbol_table: SymbolTable,
+}
+
+impl IRGenerator {
+    pub fn new() -> Self {
+        Self {
+            instructions: InstructionList::new(),
+            label_index: 0,
+            unresolved_labels: HashSet::new(),
+            label_map: HashMap::new(),
+            fn_ctx: None,
+            loop_ctx: Vec::new(),
+            symbol_table: SymbolTable::new(),
+        }
+    }
+
+    pub fn new_label(&mut self) -> InstructionLabel {
+        let ins = InstructionLabel {
+            inner: self.label_index,
+        };
+        self.label_index += 1;
+        self.unresolved_labels.insert(ins);
+        ins
+    }
 }
 
 impl Visitor<Expression, IRInstructionAddress, IRGenerationError> for IRGenerator {
@@ -159,6 +206,12 @@ impl Visitor<Expression, IRInstructionAddress, IRGenerationError> for IRGenerato
         };
         Ok(r)
     }
+}
+
+struct InstructionBlock {
+    label_id: usize,
+    body: Vec<IRInstruction>,
+    // termination: Option<Instruction>,
 }
 
 impl Visitor<Statement, (), IRGenerationError> for IRGenerator {
