@@ -184,7 +184,7 @@ struct LoopCtx {}
 
 pub struct IRGenerator {
     instructions: InstructionList,
-    items: InstructionJumpResolver,
+    jump_resolver: InstructionJumpResolver,
     fn_ctx: Option<FunctionCtx>,
     loop_ctx: Vec<LoopCtx>,
     symbol_table: SymbolTable,
@@ -194,14 +194,14 @@ impl IRGenerator {
     pub fn new() -> Self {
         Self {
             instructions: InstructionList::new(),
-            items: InstructionJumpResolver::new(),
+            jump_resolver: InstructionJumpResolver::new(),
             fn_ctx: None,
             loop_ctx: Vec::new(),
             symbol_table: SymbolTable::new(),
         }
     }
     pub fn new_item_next_inst(&mut self) -> JumpUnresolved {
-        self.items.new_by_line(self.next_inst_line())
+        self.jump_resolver.new_by_line(self.next_inst_line())
     }
     pub fn next_inst_line(&self) -> usize {
         self.instructions.instructions.len()
@@ -242,11 +242,23 @@ struct BlockInstJump {
     next: Option<JumpUnresolved>,
 }
 
-// impl Visitor<Block, BlockInstJump, IRGenerationError> for IRGenerator {
-//     fn visit(&mut self, b: &Block) -> Result<BlockInstJump, IRGenerationError> {
-//         todo!()
-//     }
-// }
+impl Visitor<Block, BlockInstJump, IRGenerationError> for IRGenerator {
+    fn visit(&mut self, b: &Block) -> Result<BlockInstJump, IRGenerationError> {
+        let ins_begin = self.next_inst_line();
+        let mut last_next: Option<JumpUnresolved>;
+        for s in b.statements {
+            let jump: BlockInstJump = s.visit_by(self)?;
+            if let Some(last_next) = last_next {
+                self.jump_resolver.back_patch(last_next, jump.ins_begin)
+            }
+            last_next = jump.next;
+        }
+        Ok(BlockInstJump {
+            ins_begin,
+            next: last_next,
+        })
+    }
+}
 
 struct BooleanInstJump {
     ins_begin: usize,
@@ -259,10 +271,27 @@ impl Visitor<Statement, BlockInstJump, IRGenerationError> for IRGenerator {
         let re = match stmt {
             Statement::Block(b) => b.visit_by(self)?,
             Statement::Declare { ty, name, init } => {
-                // self.symbol_table.declare(name, info);
+                let ins_begin = self.next_inst_line();
+                self.symbol_table.declare(name.name.as_str(), todo!());
+                BlockInstJump {
+                    ins_begin,
+                    next: None,
+                }
             }
-            Statement::Empty => {}
-            Statement::Expression(_) => {}
+            Statement::Empty => {
+                let ins_begin = self.next_inst_line();
+                BlockInstJump {
+                    ins_begin,
+                    next: None,
+                }
+            }
+            Statement::Expression(_) => {
+                let ins_begin = self.next_inst_line();
+                BlockInstJump {
+                    ins_begin,
+                    next: None,
+                }
+            }
             Statement::Return { .. } => todo!(),
             Statement::If(des) => {
                 let prediction: IRInstructionAddress = des.condition.visit_by(self)?;
@@ -272,9 +301,10 @@ impl Visitor<Statement, BlockInstJump, IRGenerationError> for IRGenerator {
                 let prediction: BooleanInstJump = des.condition.visit_by(self)?;
                 let loop_body: BlockInstJump = des.body.visit_by(self)?;
                 if let Some(loop_body_next) = loop_body.next {
-                    self.items.back_patch(loop_body_next, prediction.ins_begin);
+                    self.jump_resolver
+                        .back_patch(loop_body_next, prediction.ins_begin);
                 }
-                self.items
+                self.jump_resolver
                     .back_patch(prediction.true_tag, loop_body.ins_begin);
                 self.instructions
                     .push(IRInstruction::Goto(JumpAddress::Line(prediction.ins_begin)));
