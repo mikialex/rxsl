@@ -5,19 +5,19 @@ use crate::{ast::*, symbol_table::SymbolTable, visitor::*};
 pub enum IRInstruction {
     Binary {
         op: BinaryOperator,
-        left: IRInstructionAddress,
-        right: IRInstructionAddress,
+        left: Address,
+        right: Address,
     },
     Unary {
         op: UnaryOperator,
-        target: IRInstructionAddress,
+        target: Address,
     },
     Copy {
-        source: IRInstructionAddress,
+        source: Address,
     },
     Goto(JumpAddress),
     IfTrueGoto {
-        prediction: IRInstructionAddress,
+        prediction: Address,
         target: JumpAddress,
     },
 }
@@ -37,22 +37,18 @@ impl std::fmt::Display for JumpAddress {
 }
 
 impl IRInstruction {
-    pub fn unary(op: UnaryOperator, target: IRInstructionAddress) -> Self {
+    pub fn unary(op: UnaryOperator, target: Address) -> Self {
         Self::Unary { op, target }
     }
-    pub fn binary(
-        op: BinaryOperator,
-        left: IRInstructionAddress,
-        right: IRInstructionAddress,
-    ) -> Self {
+    pub fn binary(op: BinaryOperator, left: Address, right: Address) -> Self {
         Self::Binary { op, left, right }
     }
-    pub fn if_true_goto(prediction: IRInstructionAddress, target: JumpAddress) -> Self {
+    pub fn if_true_goto(prediction: Address, target: JumpAddress) -> Self {
         Self::IfTrueGoto { prediction, target }
     }
 }
 
-pub enum IRInstructionAddress {
+pub enum Address {
     Address(usize),
     Symbol(String),
     Const(), // todo
@@ -64,11 +60,11 @@ pub struct InstructionList {
 }
 
 impl InstructionList {
-    fn format_arg(&self, arg: &IRInstructionAddress) -> String {
+    fn format_arg(&self, arg: &Address) -> String {
         match arg {
-            IRInstructionAddress::Address(index) => format!("t{}", index),
-            IRInstructionAddress::Symbol(symbol) => format!("{}", symbol),
-            IRInstructionAddress::Const() => format!("const"),
+            Address::Address(index) => format!("t{}", index),
+            Address::Symbol(symbol) => format!("{}", symbol),
+            Address::Const() => format!("const"),
         }
     }
 }
@@ -113,11 +109,11 @@ impl InstructionList {
         }
     }
 
-    pub fn push(&mut self, ins: IRInstruction) -> IRInstructionAddress {
+    pub fn push(&mut self, ins: IRInstruction) -> Address {
         self.instruction_pool.push(ins);
         let index = self.instruction_pool.len();
         self.instructions.push(index);
-        IRInstructionAddress::Address(index)
+        Address::Address(index)
     }
 }
 
@@ -203,32 +199,81 @@ impl IRGenerator {
     pub fn new_item_next_inst(&mut self) -> JumpUnresolved {
         self.jump_resolver.new_by_line(self.next_inst_line())
     }
+    pub fn new_item_next_next_inst(&mut self) -> JumpUnresolved {
+        self.jump_resolver.new_by_line(self.next_inst_line() + 1)
+    }
     pub fn next_inst_line(&self) -> usize {
         self.instructions.instructions.len()
     }
 }
 
-impl Visitor<Expression, IRInstructionAddress, IRGenerationError> for IRGenerator {
-    fn visit(&mut self, exp: &Expression) -> Result<IRInstructionAddress, IRGenerationError> {
-        let r = match exp {
+impl Visitor<Expression, ExpInstJump, IRGenerationError> for IRGenerator {
+    fn visit(&mut self, exp: &Expression) -> Result<ExpInstJump, IRGenerationError> {
+        let ins_begin = self.next_inst_line();
+        let r: ExpInstJump = match exp {
             Expression::UnaryOperator { op, expr } => {
-                let ins = IRInstruction::unary(*op, expr.visit_by(self)?);
-                self.instructions.push(ins)
+                let exp: ExpInstJump = expr.visit_by(self)?;
+
+                let ins = IRInstruction::unary(*op, Address::Address(exp.ins_begin));
+                self.instructions.push(ins);
+                match op {
+                    UnaryOperator::Not => {
+                        let bool_exp = exp.expect_boolean()?;
+                        ExpInstJump::Bool(BooleanInstJump {
+                            ins_begin,
+                            true_tag: bool_exp.false_tag,
+                            false_tag: bool_exp.true_tag,
+                        })
+                    }
+                    _ => ExpInstJump::Common(InstJump {
+                        ins_begin,
+                        next: None,
+                    }),
+                }
             }
             Expression::BinaryOperator { left, op, right } => {
-                let arg1 = left.visit_by(self)?;
-                let arg2 = right.visit_by(self)?;
-                let ins = IRInstruction::binary(*op, arg1, arg2);
-                self.instructions.push(ins)
+                let arg1: ExpInstJump = left.visit_by(self)?;
+                let arg2: ExpInstJump = right.visit_by(self)?;
+                let ins = IRInstruction::binary(
+                    *op,
+                    Address::Address(arg1.ins_begin),
+                    Address::Address(arg2.ins_begin),
+                );
+                let compute = self.instructions.push(ins);
+
+                let re = match op {
+                    BinaryOperator::Less
+                    | BinaryOperator::LessEqual
+                    | BinaryOperator::Greater
+                    | BinaryOperator::GreaterEqual
+                    | BinaryOperator::Equal
+                    | BinaryOperator::NotEqual => {
+                        let j = ExpInstJump::Bool(BooleanInstJump {
+                            ins_begin,
+                            true_tag: self.new_item_next_inst(),
+                            false_tag: self.new_item_next_next_inst(),
+                        });
+                        self.instructions
+                            .push(IRInstruction::if_true_goto(compute, JumpAddress::Unknown));
+                        self.instructions
+                            .push(IRInstruction::Goto(JumpAddress::Unknown));
+                        j
+                    }
+                    _ => ExpInstJump::Common(InstJump {
+                        ins_begin,
+                        next: None,
+                    }),
+                };
+                re
             }
             Expression::FunctionCall(_) => todo!(),
             Expression::ArrayAccess { array, index } => todo!(),
             Expression::ItemAccess { from, to } => todo!(),
             Expression::Assign { left, right } => todo!(),
-            Expression::Number {} => IRInstructionAddress::Const(),
-            Expression::Bool(v) => IRInstructionAddress::Const(),
+            Expression::Number {} => Address::Const(),
+            Expression::Bool(v) => Address::Const(),
             Expression::Ident(name) => {
-                IRInstructionAddress::Symbol(name.name.clone())
+                Address::Symbol(name.name.clone())
                 // todo!()
                 // self.symbol_table.search(name.name.as_str());
             }
@@ -237,26 +282,37 @@ impl Visitor<Expression, IRInstructionAddress, IRGenerationError> for IRGenerato
     }
 }
 
-struct BlockInstJump {
+struct InstJump {
     ins_begin: usize,
     next: Option<JumpUnresolved>,
 }
 
-impl Visitor<Block, BlockInstJump, IRGenerationError> for IRGenerator {
-    fn visit(&mut self, b: &Block) -> Result<BlockInstJump, IRGenerationError> {
+impl Visitor<Block, InstJump, IRGenerationError> for IRGenerator {
+    fn visit(&mut self, b: &Block) -> Result<InstJump, IRGenerationError> {
         let ins_begin = self.next_inst_line();
         let mut last_next: Option<JumpUnresolved>;
         for s in b.statements {
-            let jump: BlockInstJump = s.visit_by(self)?;
+            let jump: InstJump = s.visit_by(self)?;
             if let Some(last_next) = last_next {
                 self.jump_resolver.back_patch(last_next, jump.ins_begin)
             }
             last_next = jump.next;
         }
-        Ok(BlockInstJump {
+        Ok(InstJump {
             ins_begin,
             next: last_next,
         })
+    }
+}
+
+pub enum ExpInstJump {
+    Common(InstJump),
+    Bool(BooleanInstJump),
+}
+
+impl ExpInstJump {
+    pub fn expect_boolean(&self) -> Result<BooleanInstJump, IRGenerationError> {
+        todo!()
     }
 }
 
@@ -266,40 +322,40 @@ struct BooleanInstJump {
     false_tag: JumpUnresolved,
 }
 
-impl Visitor<Statement, BlockInstJump, IRGenerationError> for IRGenerator {
-    fn visit(&mut self, stmt: &Statement) -> Result<BlockInstJump, IRGenerationError> {
+impl Visitor<Statement, InstJump, IRGenerationError> for IRGenerator {
+    fn visit(&mut self, stmt: &Statement) -> Result<InstJump, IRGenerationError> {
         let re = match stmt {
             Statement::Block(b) => b.visit_by(self)?,
             Statement::Declare { ty, name, init } => {
                 let ins_begin = self.next_inst_line();
                 self.symbol_table.declare(name.name.as_str(), todo!());
-                BlockInstJump {
+                InstJump {
                     ins_begin,
                     next: None,
                 }
             }
             Statement::Empty => {
                 let ins_begin = self.next_inst_line();
-                BlockInstJump {
+                InstJump {
                     ins_begin,
                     next: None,
                 }
             }
             Statement::Expression(_) => {
                 let ins_begin = self.next_inst_line();
-                BlockInstJump {
+                InstJump {
                     ins_begin,
                     next: None,
                 }
             }
             Statement::Return { .. } => todo!(),
             Statement::If(des) => {
-                let prediction: IRInstructionAddress = des.condition.visit_by(self)?;
+                let prediction: Address = des.condition.visit_by(self)?;
                 todo!()
             }
             Statement::While(des) => {
                 let prediction: BooleanInstJump = des.condition.visit_by(self)?;
-                let loop_body: BlockInstJump = des.body.visit_by(self)?;
+                let loop_body: InstJump = des.body.visit_by(self)?;
                 if let Some(loop_body_next) = loop_body.next {
                     self.jump_resolver
                         .back_patch(loop_body_next, prediction.ins_begin);
@@ -308,7 +364,7 @@ impl Visitor<Statement, BlockInstJump, IRGenerationError> for IRGenerator {
                     .back_patch(prediction.true_tag, loop_body.ins_begin);
                 self.instructions
                     .push(IRInstruction::Goto(JumpAddress::Line(prediction.ins_begin)));
-                BlockInstJump {
+                InstJump {
                     ins_begin: prediction.ins_begin,
                     next: prediction.false_tag.into(),
                 }
