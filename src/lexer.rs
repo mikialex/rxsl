@@ -10,6 +10,8 @@ pub enum Keyword {
     For,
     While,
     Return,
+    Break,
+    Continue,
     Declare(DeclarationType),
     Function,
 }
@@ -241,6 +243,8 @@ fn consume_token(mut input: &str, generic: bool) -> (Token<'_>, &str) {
                 "while" => (Token::Keyword(Keyword::While), rest),
                 "for" => (Token::Keyword(Keyword::For), rest),
                 "return" => (Token::Keyword(Keyword::Return), rest),
+                "break" => (Token::Keyword(Keyword::Break), rest),
+                "continue" => (Token::Keyword(Keyword::Continue), rest),
                 "let" => (Token::Keyword(Keyword::Declare(DeclarationType::Let)), rest),
                 "const" => (
                     Token::Keyword(Keyword::Declare(DeclarationType::Const)),

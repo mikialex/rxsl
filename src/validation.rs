@@ -53,19 +53,6 @@ impl<'a> Visitor<Expression, PrimitiveType, TypeError> for TypeChecker<'a> {
                 if left_ty != right_ty {
                     return Err(TypeError("type not same between binary operator"));
                 }
-                match op {
-                    BinaryOperator::Add => {}
-                    BinaryOperator::Sub => {}
-                    BinaryOperator::Mul => {}
-                    BinaryOperator::Div => {}
-                    BinaryOperator::Mod => {}
-                    BinaryOperator::Less => {}
-                    BinaryOperator::LessEqual => {}
-                    BinaryOperator::Greater => {}
-                    BinaryOperator::GreaterEqual => {}
-                    BinaryOperator::Equal => {}
-                    BinaryOperator::NotEqual => {}
-                }
                 //
                 todo!()
             }

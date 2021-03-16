@@ -94,6 +94,16 @@ impl SyntaxElement for Statement {
                     lexer.expect(Token::Separator(';'))?;
                     Statement::Return { value }
                 }
+                Break => {
+                    let _ = lexer.next();
+                    lexer.expect(Token::Separator(';'))?;
+                    Statement::Break
+                }
+                Continue => {
+                    let _ = lexer.next();
+                    lexer.expect(Token::Separator(';'))?;
+                    Statement::Continue
+                }
                 If => {
                     let _ = lexer.next();
                     let condition = Expression::parse(lexer)?;
@@ -225,6 +235,61 @@ fn parse_assignment_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, 
 }
 
 pub fn parse_exp_with_binary_operators<'a>(
+    lexer: &mut Lexer<'a>,
+) -> Result<Expression, ParseError<'a>> {
+    parse_binary_op_left(
+        lexer,
+        |token| match token {
+            Token::LogicalOperation('|') => Some(BinaryOperator::LogicalOr),
+            _ => None,
+        },
+        // logical_and_expression
+        |lexer| {
+            parse_binary_op_left(
+                lexer,
+                |token| match token {
+                    Token::LogicalOperation('&') => Some(BinaryOperator::LogicalAnd),
+                    _ => None,
+                },
+                // inclusive_or_expression
+                |lexer| {
+                    parse_binary_op_left(
+                        lexer,
+                        |token| match token {
+                            Token::Operation('|') => Some(BinaryOperator::Or),
+                            _ => None,
+                        },
+                        // exclusive_or_expression
+                        |lexer| {
+                            parse_binary_op_left(
+                                lexer,
+                                |token| match token {
+                                    Token::Operation('^') => Some(BinaryOperator::Xor),
+                                    _ => None,
+                                },
+                                // and_expression
+                                |lexer| {
+                                    parse_binary_op_left(
+                                        lexer,
+                                        |token| match token {
+                                            Token::Operation('&') => Some(BinaryOperator::And),
+                                            _ => None,
+                                        },
+                                        |lexer| {
+                                            parse_exp_with_binary_operators_no_logic_no_bit(lexer)
+                                        },
+                                    )
+                                },
+                            )
+                        },
+                    )
+                },
+            )
+        },
+    )
+}
+
+pub fn parse_exp_with_binary_operators_no_logic_no_bit<'a>(
     lexer: &mut Lexer<'a>,
 ) -> Result<Expression, ParseError<'a>> {
     // equality_expression

@@ -66,6 +66,8 @@ pub enum Statement {
     },
     If(If),
     While(While),
+    Break,
+    Continue,
     For(For),
 }
 
@@ -153,6 +155,11 @@ pub enum BinaryOperator {
     GreaterEqual,
     Equal,
     NotEqual,
+    And,
+    Or,
+    Xor,
+    LogicalAnd,
+    LogicalOr,
 }
 
 impl std::fmt::Display for BinaryOperator {
@@ -169,6 +176,11 @@ impl std::fmt::Display for BinaryOperator {
             BinaryOperator::GreaterEqual => write!(f, ">="),
             BinaryOperator::Equal => write!(f, "=="),
             BinaryOperator::NotEqual => write!(f, "!="),
+            BinaryOperator::And => write!(f, "&"),
+            BinaryOperator::Or => write!(f, "|"),
+            BinaryOperator::Xor => write!(f, "^"),
+            BinaryOperator::LogicalAnd => write!(f, "&&"),
+            BinaryOperator::LogicalOr => write!(f, "||"),
         }
     }
 }
