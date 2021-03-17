@@ -286,28 +286,48 @@ impl IRGenerator {
         })
     }
 
-    pub fn pop_loop_ctx(&mut self, next: Option<JumpUnresolved>) -> Option<JumpUnresolved> {
+    pub fn pop_loop_ctx(
+        &mut self,
+        previous_next: Option<JumpUnresolved>,
+    ) -> Option<JumpUnresolved> {
         let ctx = self.loop_ctx.pop().expect("no loop context stored");
-        self.merge(ctx.next, next)
+        self.merge(ctx.next, previous_next)
     }
 
-    pub fn goto_loop_continue(&mut self) {
+    pub fn loop_continue(&mut self, previous_next: Option<JumpUnresolved>) -> InstJump {
         let start = self.loop_ctx.last().expect("no loop context stored").start;
+        let ins_begin = self.next_inst_line();
+        self.back_patch(previous_next, start);
         self.push_inst(IRInstruction::Jump(JumpInstruction::Goto(
             JumpAddress::Line(start),
         )));
+        InstJump {
+            ins_begin,
+            next: None,
+        }
+    }
+    pub fn loop_break(&mut self, previous_next: Option<JumpUnresolved>) -> InstJump {
+        let loop_next = self.loop_ctx.last().expect("no loop context stored").next;
+        let merged = self.merge(loop_next, previous_next);
+        let ins_begin = self.next_inst_line();
+        let unknown = self.push_unknown_jump(unknown_goto());
+        let next = self.merge(merged, unknown.into());
+
+        InstJump { ins_begin, next }
     }
 
     pub fn push_inst(&mut self, ins: IRInstruction) -> Address {
         self.instructions.push(ins)
     }
 
+    #[must_use]
     pub fn push_unknown_jump(&mut self, jump: JumpInstruction) -> JumpUnresolved {
         let r = self.jump_resolver.new_by_line(self.next_inst_line());
         self.push_inst(IRInstruction::Jump(jump));
         r
     }
 
+    #[must_use]
     pub fn next_inst_line(&self) -> usize {
         self.instructions.instructions.len()
     }
@@ -317,6 +337,7 @@ impl IRGenerator {
             .back_patch(jump, line, &mut self.instructions)
     }
 
+    #[must_use]
     pub fn merge(
         &mut self,
         one: Option<JumpUnresolved>,
@@ -483,6 +504,17 @@ impl IRGenerator {
             Statement::Declare { ty, name, init } => {
                 let ins_begin = self.next_inst_line();
                 self.symbol_table.declare(name.name.as_str(), todo!());
+                if let Some(init) = init {
+                    let (source, exp) = init.visit_by(self)?;
+                    match exp {
+                        ExpInstJump::Common(j) => self.back_patch(j.next, self.next_inst_line()),
+                        ExpInstJump::Bool(b) => {
+                            self.back_patch(b.true_tag, self.next_inst_line());
+                            self.back_patch(b.false_tag, self.next_inst_line())
+                        }
+                    }
+                    self.push_inst(IRInstruction::Copy { source });
+                }
                 InstJump {
                     ins_begin,
                     next: None,
@@ -492,7 +524,7 @@ impl IRGenerator {
                 let ins_begin = self.next_inst_line();
                 InstJump {
                     ins_begin,
-                    next: None,
+                    next: previous_next,
                 }
             }
             Statement::Expression(_) => {
@@ -503,17 +535,8 @@ impl IRGenerator {
                 }
             }
             Statement::Return { .. } => todo!(),
-            Statement::Continue => {
-                let ins_begin = self.next_inst_line();
-                self.goto_loop_continue();
-                // back_patch?
-                todo!();
-                InstJump {
-                    ins_begin,
-                    next: None,
-                }
-            }
-            Statement::Break => todo!(),
+            Statement::Continue => self.loop_continue(previous_next),
+            Statement::Break => self.loop_break(previous_next),
             Statement::If(des) => {
                 let (_, prediction): (Address, ExpInstJump) = des.condition.visit_by(self)?;
                 let prediction = prediction.expect_boolean()?;
