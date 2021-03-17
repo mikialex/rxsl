@@ -439,7 +439,7 @@ impl Visitor<Block, InstJump, IRGenerationError> for IRGenerator {
         let ins_begin = self.next_inst_line();
         let mut last_next: Option<JumpUnresolved> = None;
         for s in &b.statements {
-            let jump: InstJump = s.visit_by(self)?;
+            let jump = self.code_gen_statement(s, last_next)?;
             self.back_patch(last_next, jump.ins_begin);
             last_next = jump.next;
         }
@@ -472,8 +472,12 @@ pub struct BooleanInstExpJump {
     false_tag: Option<JumpUnresolved>,
 }
 
-impl Visitor<Statement, InstJump, IRGenerationError> for IRGenerator {
-    fn visit(&mut self, stmt: &Statement) -> Result<InstJump, IRGenerationError> {
+impl IRGenerator {
+    fn code_gen_statement(
+        &mut self,
+        stmt: &Statement,
+        previous_next: Option<JumpUnresolved>,
+    ) -> Result<InstJump, IRGenerationError> {
         let re = match stmt {
             Statement::Block(b) => b.visit_by(self)?,
             Statement::Declare { ty, name, init } => {
