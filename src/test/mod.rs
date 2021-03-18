@@ -30,6 +30,9 @@ fn parse_expression_test() {
     parse(" 1 < 2");
     parse(" 1 < 2 == 2");
 
+    parse(" false && false");
+    parse(" 1 & 2 == 1 || false ");
+
     parse("test[1]");
     parse("test2[1]/2");
     parse("test2.ui");
