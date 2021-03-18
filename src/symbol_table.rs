@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use crate::ir::PrimitiveType;
+use crate::ir::TypeInValidation;
 
 pub struct SymbolInfo {
-    pub ty: PrimitiveType,
+    pub ty: TypeInValidation,
 }
 
 pub struct SymbolTable {
@@ -12,7 +12,8 @@ pub struct SymbolTable {
 }
 
 pub enum SymbolError {
-    SameNamedSymbolHasExistInScope(String),
+    NameConflict(String),
+    NotExist(String),
 }
 
 impl SymbolTable {
@@ -24,20 +25,23 @@ impl SymbolTable {
     }
 
     #[must_use]
-    pub fn search(&self, name: &str) -> Option<&SymbolInfo> {
-        self.symbols.get(name).or_else(|| {
-            self.outer_scope
-                .as_ref()
-                .map(|outer| outer.search(name))
-                .flatten()
-        })
+    pub fn search(&self, name: &str) -> Result<&SymbolInfo, SymbolError> {
+        self.symbols
+            .get(name)
+            .or_else(|| {
+                self.outer_scope
+                    .as_ref()
+                    .map(|outer| outer.search(name).ok())
+                    .flatten()
+            })
+            .ok_or(SymbolError::NotExist(name.to_owned()))
     }
 
     pub fn declare(&mut self, name: &str, info: SymbolInfo) -> Result<(), SymbolError> {
         let previous = self.symbols.insert(name.to_owned(), info);
         // do options have map none to result method?
         if previous.is_some() {
-            Err(SymbolError::SameNamedSymbolHasExistInScope(name.to_owned()))
+            Err(SymbolError::NameConflict(name.to_owned()))
         } else {
             Ok(())
         }

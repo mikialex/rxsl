@@ -8,7 +8,7 @@ use crate::{
 // can print log in unit test, but have some order issue
 pub fn parse(input: &str) -> Expression {
     let r = Expression::parse(&mut Lexer::new(input)).unwrap();
-    println!("{:?}", r);
+    println!("{:#?}", r);
     r
 }
 

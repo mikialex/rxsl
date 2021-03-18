@@ -151,14 +151,16 @@ pub struct ScalarType {
 pub enum PrimitiveType {
     Scalar(ScalarType),
     Bool,
-    Unknown,
 }
 
-pub enum TypeInValidation {}
+pub enum TypeInValidation {
+    Unknown,
+    Resolved(PrimitiveType),
+}
 
 pub enum IRGenerationError {
     TypeError,
-    SymbolNotExist,
+    SymbolError(SymbolError),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -446,7 +448,7 @@ impl Visitor<Expression, (Address, ExpInstJump), IRGenerationError> for IRGenera
             Expression::Ident(name) => {
                 self.symbol_table
                     .search(name.name.as_str())
-                    .ok_or(IRGenerationError::SymbolNotExist)?;
+                    .map_err(|e| IRGenerationError::SymbolError(e))?;
                 (
                     Address::Symbol(),
                     ExpInstJump::Common(InstJump {
@@ -514,12 +516,14 @@ impl IRGenerator {
             Statement::Block(b) => b.visit_by(self)?,
             Statement::Declare { ty, name, init } => {
                 let ins_begin = self.next_inst_line();
-                self.symbol_table.declare(
-                    name.name.as_str(),
-                    SymbolInfo {
-                        ty: PrimitiveType::Unknown,
-                    },
-                );
+                self.symbol_table
+                    .declare(
+                        name.name.as_str(),
+                        SymbolInfo {
+                            ty: TypeInValidation::Unknown,
+                        },
+                    )
+                    .map_err(|e| IRGenerationError::SymbolError(e))?;
                 if let Some(init) = init {
                     let (source, exp) = init.visit_by(self)?;
                     match exp {
