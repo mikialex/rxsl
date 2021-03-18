@@ -466,7 +466,9 @@ fn parse_binary_like_right<'a, L, R>(
         }
         right_parser(lexer)
     } else {
-        return right_parser(&mut backup);
+        let r = right_parser(&mut backup);
+        *lexer = backup;
+        r
     }
 }
 

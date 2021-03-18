@@ -43,7 +43,7 @@ fn parse_expression_test() {
 
 fn test_parse_statement(input: &str) -> Statement {
     let r = Statement::parse(&mut Lexer::new(input)).unwrap();
-    println!("{:?}", r);
+    println!("{:#?}", r);
     r
 }
 
