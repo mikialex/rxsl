@@ -1,6 +1,6 @@
 use std::{collections::HashMap, todo};
 
-use crate::{ast::*, symbol_table::SymbolTable, visitor::*};
+use crate::{ast::*, symbol_table::*, visitor::*};
 
 pub enum IRInstruction {
     Binary {
@@ -151,10 +151,14 @@ pub struct ScalarType {
 pub enum PrimitiveType {
     Scalar(ScalarType),
     Bool,
+    Unknown,
 }
+
+pub enum TypeInValidation {}
 
 pub enum IRGenerationError {
     TypeError,
+    SymbolNotExist,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -440,9 +444,16 @@ impl Visitor<Expression, (Address, ExpInstJump), IRGenerationError> for IRGenera
                 (Address::Const(), jmp)
             }
             Expression::Ident(name) => {
-                (Address::Symbol(), todo!())
-                // todo!()
-                // self.symbol_table.search(name.name.as_str());
+                self.symbol_table
+                    .search(name.name.as_str())
+                    .ok_or(IRGenerationError::SymbolNotExist)?;
+                (
+                    Address::Symbol(),
+                    ExpInstJump::Common(InstJump {
+                        ins_begin,
+                        next: None,
+                    }),
+                )
             }
         };
         Ok(r)
@@ -503,7 +514,12 @@ impl IRGenerator {
             Statement::Block(b) => b.visit_by(self)?,
             Statement::Declare { ty, name, init } => {
                 let ins_begin = self.next_inst_line();
-                self.symbol_table.declare(name.name.as_str(), todo!());
+                self.symbol_table.declare(
+                    name.name.as_str(),
+                    SymbolInfo {
+                        ty: PrimitiveType::Unknown,
+                    },
+                );
                 if let Some(init) = init {
                     let (source, exp) = init.visit_by(self)?;
                     match exp {

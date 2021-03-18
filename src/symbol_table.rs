@@ -23,6 +23,7 @@ impl SymbolTable {
         }
     }
 
+    #[must_use]
     pub fn search(&self, name: &str) -> Option<&SymbolInfo> {
         self.symbols.get(name).or_else(|| {
             self.outer_scope
