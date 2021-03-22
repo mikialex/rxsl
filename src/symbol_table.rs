@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::ir::TypeInValidation;
 
 pub struct SymbolInfo {
+    pub is_const: bool,
     pub ty: TypeInValidation,
 }
 

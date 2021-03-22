@@ -520,6 +520,7 @@ impl IRGenerator {
                     .declare(
                         name.name.as_str(),
                         SymbolInfo {
+                            is_const: *ty == DeclarationType::Const,
                             ty: TypeInValidation::Unknown,
                         },
                     )
