@@ -12,6 +12,7 @@ pub struct SymbolTable {
     outer_scope: Option<Box<SymbolTable>>,
 }
 
+#[derive(Debug)]
 pub enum SymbolError {
     NameConflict(String),
     NotExist(String),

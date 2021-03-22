@@ -158,6 +158,7 @@ pub enum TypeInValidation {
     Resolved(PrimitiveType),
 }
 
+#[derive(Debug)]
 pub enum IRGenerationError {
     TypeError,
     SymbolError(SymbolError),
@@ -285,6 +286,13 @@ impl IRGenerator {
             symbol_table: SymbolTable::new(),
         }
     }
+
+    pub fn generate(ast: &Block) -> Result<InstructionList, IRGenerationError> {
+        let mut generator = Self::new();
+        let _: InstJump = ast.visit_by(&mut generator)?;
+        Ok(generator.instructions)
+    }
+
     pub fn push_loop_ctx(&mut self) {
         self.loop_ctx.push(LoopCtx {
             start: self.next_inst_line(),

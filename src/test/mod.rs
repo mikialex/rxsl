@@ -1,5 +1,6 @@
 use crate::{
-    ast::{Expression, Statement, SyntaxElement},
+    ast::{Block, Expression, Statement, SyntaxElement},
+    ir::IRGenerator,
     lexer::Lexer,
     parser::*,
 };
@@ -81,4 +82,17 @@ fn parse_st_test() {
         }
     ",
     );
+}
+
+#[test]
+fn parse_ir_test() {
+    let input = r#"
+{
+    let a = 1;
+}
+    "#;
+
+    let ast = Block::parse(&mut Lexer::new(input)).unwrap();
+    let ins = IRGenerator::generate(&ast).unwrap();
+    println!("{}", ins)
 }
