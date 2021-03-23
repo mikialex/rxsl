@@ -129,11 +129,11 @@ impl InstructionList {
         }
     }
 
-    pub fn push(&mut self, ins: IRInstruction) -> Address {
+    pub fn push(&mut self, ins: IRInstruction) -> usize {
         self.instruction_pool.push(ins);
         let index = self.instruction_pool.len();
         self.instructions.push(index);
-        Address::Address(index)
+        index
     }
 }
 
@@ -264,7 +264,7 @@ struct FunctionCtx {
 }
 
 struct LoopCtx {
-    start: usize,
+    start: Option<JumpUnresolved>,
     next: Option<JumpUnresolved>,
 }
 
@@ -295,60 +295,75 @@ impl IRGenerator {
 
     pub fn push_loop_ctx(&mut self) {
         self.loop_ctx.push(LoopCtx {
-            start: self.next_inst_line(),
+            start: None,
             next: self.jump_resolver.new_empty().into(),
         })
     }
 
     pub fn pop_loop_ctx(
         &mut self,
+        loop_start: Option<usize>,
         previous_next: Option<JumpUnresolved>,
     ) -> Option<JumpUnresolved> {
         let ctx = self.loop_ctx.pop().expect("no loop context stored");
-        self.merge(ctx.next, previous_next)
+        let mut r = self.merge(ctx.next, previous_next);
+        self.back_patch_or_merge(ctx.start, loop_start, &mut r);
+        r
     }
 
     pub fn loop_continue(&mut self, previous_next: Option<JumpUnresolved>) -> InstJump {
         let start = self.loop_ctx.last().expect("no loop context stored").start;
-        let ins_begin = self.next_inst_line();
-        self.back_patch(previous_next, start);
-        self.push_inst(IRInstruction::Jump(JumpInstruction::Goto(
-            JumpAddress::Line(start),
-        )));
+        let ins_begin = self.push_unknown_jump(unknown_goto());
         InstJump {
-            ins_begin,
-            next: None,
+            ins_begin: ins_begin.0.into(),
+            next: self.merge(previous_next, start),
         }
     }
     pub fn loop_break(&mut self, previous_next: Option<JumpUnresolved>) -> InstJump {
         let loop_next = self.loop_ctx.last().expect("no loop context stored").next;
         let merged = self.merge(loop_next, previous_next);
-        let ins_begin = self.next_inst_line();
         let unknown = self.push_unknown_jump(unknown_goto());
-        let next = self.merge(merged, unknown.into());
+        let next = self.merge(merged, unknown.1.into());
 
-        InstJump { ins_begin, next }
+        InstJump {
+            ins_begin: unknown.0.into(),
+            next,
+        }
     }
 
-    pub fn push_inst(&mut self, ins: IRInstruction) -> Address {
+    pub fn push_inst(&mut self, ins: IRInstruction) -> usize {
         self.instructions.push(ins)
     }
 
     #[must_use]
-    pub fn push_unknown_jump(&mut self, jump: JumpInstruction) -> JumpUnresolved {
-        let r = self.jump_resolver.new_by_line(self.next_inst_line());
-        self.push_inst(IRInstruction::Jump(jump));
-        r
+    pub fn push_unknown_jump(&mut self, jump: JumpInstruction) -> (usize, JumpUnresolved) {
+        let line = self.push_inst(IRInstruction::Jump(jump));
+        let r = self.jump_resolver.new_by_line(line);
+        (line, r)
     }
 
-    #[must_use]
-    pub fn next_inst_line(&self) -> usize {
-        self.instructions.instructions.len()
-    }
+    // #[must_use]
+    // pub fn next_inst_line(&self) -> usize {
+    //     self.instructions.instructions.len()
+    // }
 
     pub fn back_patch(&mut self, jump: Option<JumpUnresolved>, line: usize) {
         self.jump_resolver
             .back_patch(jump, line, &mut self.instructions)
+    }
+
+    pub fn back_patch_or_merge(
+        &mut self,
+        jump: Option<JumpUnresolved>,
+        line: Option<usize>,
+        next: &mut Option<JumpUnresolved>,
+    ) {
+        if let Some(line) = line {
+            self.jump_resolver
+                .back_patch(jump, line, &mut self.instructions)
+        } else {
+            *next = self.merge(jump, *next);
+        }
     }
 
     #[must_use]
@@ -363,11 +378,10 @@ impl IRGenerator {
 
 impl Visitor<Expression, (Address, ExpInstJump), IRGenerationError> for IRGenerator {
     fn visit(&mut self, exp: &Expression) -> Result<(Address, ExpInstJump), IRGenerationError> {
-        let ins_begin = self.next_inst_line();
         let r: (Address, ExpInstJump) = match exp {
             Expression::UnaryOperator { op, expr } => {
                 let (address, exp): (Address, ExpInstJump) = expr.visit_by(self)?;
-                self.push_inst(IRInstruction::unary(*op, address));
+                let ins_begin = self.push_inst(IRInstruction::unary(*op, address)).into();
 
                 let jmp = match op {
                     UnaryOperator::Not => {
@@ -398,26 +412,37 @@ impl Visitor<Expression, (Address, ExpInstJump), IRGenerationError> for IRGenera
                     | BinaryOperator::GreaterEqual
                     | BinaryOperator::Equal
                     | BinaryOperator::NotEqual => ExpInstJump::Bool(BooleanInstExpJump {
-                        ins_begin,
-                        true_tag: self.push_unknown_jump(unknown_goto_if_true(compute)).into(),
-                        false_tag: self.push_unknown_jump(unknown_goto()).into(),
+                        ins_begin: compute.into(),
+                        true_tag: self
+                            .push_unknown_jump(unknown_goto_if_true(Address::Address(compute)))
+                            .1
+                            .into(),
+                        false_tag: self.push_unknown_jump(unknown_goto()).1.into(),
                     }),
                     BinaryOperator::LogicalAnd | BinaryOperator::LogicalOr => {
                         let arg1 = arg1.expect_boolean()?;
-                        let arg2 = arg2.expect_boolean()?;
+                        let mut arg2 = arg2.expect_boolean()?;
                         match op {
                             BinaryOperator::LogicalOr => {
-                                self.back_patch(arg1.false_tag, arg2.ins_begin);
+                                self.back_patch_or_merge(
+                                    arg1.false_tag,
+                                    arg2.ins_begin,
+                                    arg2.get_single_jump().1,
+                                );
                                 ExpInstJump::Bool(BooleanInstExpJump {
-                                    ins_begin,
+                                    ins_begin: compute.into(),
                                     true_tag: self.merge(arg1.true_tag, arg2.true_tag),
                                     false_tag: arg2.false_tag,
                                 })
                             }
                             BinaryOperator::LogicalAnd => {
-                                self.back_patch(arg1.true_tag, arg2.ins_begin);
+                                self.back_patch_or_merge(
+                                    arg1.true_tag,
+                                    arg2.ins_begin,
+                                    &mut arg2.get_single_jump().1,
+                                );
                                 ExpInstJump::Bool(BooleanInstExpJump {
-                                    ins_begin,
+                                    ins_begin: compute.into(),
                                     true_tag: arg2.true_tag,
                                     false_tag: self.merge(arg1.false_tag, arg2.false_tag),
                                 })
@@ -426,11 +451,11 @@ impl Visitor<Expression, (Address, ExpInstJump), IRGenerationError> for IRGenera
                         }
                     }
                     _ => ExpInstJump::Common(InstJump {
-                        ins_begin,
+                        ins_begin: compute.into(),
                         next: None,
                     }),
                 };
-                (compute, re)
+                (Address::Address(compute), re)
             }
             Expression::FunctionCall(_) => todo!(),
             Expression::ArrayAccess { array, index } => todo!(),
@@ -439,16 +464,18 @@ impl Visitor<Expression, (Address, ExpInstJump), IRGenerationError> for IRGenera
             Expression::Number {} => todo!(),
             Expression::Bool(v) => {
                 let jmp = if *v {
+                    let true_tag = self.push_unknown_jump(unknown_goto());
                     ExpInstJump::Bool(BooleanInstExpJump {
-                        ins_begin,
-                        true_tag: self.push_unknown_jump(unknown_goto()).into(),
+                        ins_begin: true_tag.0.into(),
+                        true_tag: true_tag.1.into(),
                         false_tag: None,
                     })
                 } else {
+                    let false_tag = self.push_unknown_jump(unknown_goto());
                     ExpInstJump::Bool(BooleanInstExpJump {
-                        ins_begin,
+                        ins_begin: false_tag.0.into(),
                         true_tag: None,
-                        false_tag: self.push_unknown_jump(unknown_goto()).into(),
+                        false_tag: false_tag.1.into(),
                     })
                 };
                 (Address::Const(), jmp)
@@ -460,7 +487,7 @@ impl Visitor<Expression, (Address, ExpInstJump), IRGenerationError> for IRGenera
                 (
                     Address::Symbol(),
                     ExpInstJump::Common(InstJump {
-                        ins_begin,
+                        ins_begin: None,
                         next: None,
                     }),
                 )
@@ -472,17 +499,20 @@ impl Visitor<Expression, (Address, ExpInstJump), IRGenerationError> for IRGenera
 
 #[derive(Debug, Clone, Copy)]
 pub struct InstJump {
-    ins_begin: usize,
+    ins_begin: Option<usize>,
     next: Option<JumpUnresolved>,
 }
 
 impl Visitor<Block, InstJump, IRGenerationError> for IRGenerator {
     fn visit(&mut self, b: &Block) -> Result<InstJump, IRGenerationError> {
-        let ins_begin = self.next_inst_line();
+        let mut ins_begin = None;
         let mut last_next: Option<JumpUnresolved> = None;
         for s in &b.statements {
-            let jump = self.code_gen_statement(s, last_next)?;
-            self.back_patch(last_next, jump.ins_begin);
+            let mut jump = self.code_gen_statement(s, last_next)?;
+            if ins_begin.is_none() {
+                ins_begin = jump.ins_begin;
+            }
+            self.back_patch_or_merge(last_next, jump.ins_begin, &mut jump.next);
             last_next = jump.next;
         }
         Ok(InstJump {
@@ -509,9 +539,25 @@ impl ExpInstJump {
 
 #[derive(Debug, Clone, Copy)]
 pub struct BooleanInstExpJump {
-    ins_begin: usize,
+    ins_begin: Option<usize>,
     true_tag: Option<JumpUnresolved>,
     false_tag: Option<JumpUnresolved>,
+}
+
+impl BooleanInstExpJump {
+    pub fn get_single_jump(&mut self) -> (bool, &mut Option<JumpUnresolved>) {
+        if self.true_tag.is_some() && self.false_tag.is_some() {
+            panic!()
+        }
+        if self.true_tag.is_none() && self.false_tag.is_none() {
+            panic!()
+        }
+        if self.true_tag.is_some() {
+            (true, &mut self.true_tag)
+        } else {
+            (false, &mut self.false_tag)
+        }
+    }
 }
 
 impl IRGenerator {
@@ -523,7 +569,6 @@ impl IRGenerator {
         let re = match stmt {
             Statement::Block(b) => b.visit_by(self)?,
             Statement::Declare { ty, name, init } => {
-                let ins_begin = self.next_inst_line();
                 self.symbol_table
                     .declare(
                         name.name.as_str(),
@@ -535,49 +580,56 @@ impl IRGenerator {
                     .map_err(|e| IRGenerationError::SymbolError(e))?;
                 if let Some(init) = init {
                     let (source, exp) = init.visit_by(self)?;
+                    let ins_begin = self.push_inst(IRInstruction::Copy { source });
                     match exp {
-                        ExpInstJump::Common(j) => self.back_patch(j.next, self.next_inst_line()),
+                        ExpInstJump::Common(j) => self.back_patch(j.next, ins_begin),
                         ExpInstJump::Bool(b) => {
-                            self.back_patch(b.true_tag, self.next_inst_line());
-                            self.back_patch(b.false_tag, self.next_inst_line())
+                            self.back_patch(b.true_tag, ins_begin);
+                            self.back_patch(b.false_tag, ins_begin)
                         }
                     }
-                    self.push_inst(IRInstruction::Copy { source });
-                }
-                InstJump {
-                    ins_begin,
-                    next: None,
-                }
-            }
-            Statement::Empty => {
-                let ins_begin = self.next_inst_line();
-                InstJump {
-                    ins_begin,
-                    next: previous_next,
+                    InstJump {
+                        ins_begin: ins_begin.into(),
+                        next: previous_next,
+                    }
+                } else {
+                    InstJump {
+                        ins_begin: None,
+                        next: previous_next,
+                    }
                 }
             }
-            Statement::Expression(_) => {
-                let ins_begin = self.next_inst_line();
-                InstJump {
-                    ins_begin,
-                    next: None,
-                }
-            }
+            Statement::Empty => InstJump {
+                ins_begin: None,
+                next: previous_next,
+            },
+            Statement::Expression(_) => InstJump {
+                ins_begin: None,
+                next: previous_next,
+            },
             Statement::Return { .. } => todo!(),
             Statement::Continue => self.loop_continue(previous_next),
             Statement::Break => self.loop_break(previous_next),
             Statement::If(des) => {
                 let (_, prediction): (Address, ExpInstJump) = des.condition.visit_by(self)?;
                 let prediction = prediction.expect_boolean()?;
-                let first_accept_block: InstJump = des.accept.visit_by(self)?;
-                self.back_patch(prediction.true_tag, first_accept_block.ins_begin);
+                let mut first_accept_block: InstJump = des.accept.visit_by(self)?;
+                self.back_patch_or_merge(
+                    prediction.true_tag,
+                    first_accept_block.ins_begin,
+                    &mut first_accept_block.next,
+                );
 
                 let mut next = first_accept_block.next;
 
                 let else_block = if let Some(reject) = &des.reject {
-                    let else_block: InstJump = reject.visit_by(self)?;
+                    let mut else_block: InstJump = reject.visit_by(self)?;
                     next = self.merge(else_block.next, next);
-                    self.back_patch(prediction.true_tag, else_block.ins_begin);
+                    self.back_patch_or_merge(
+                        prediction.true_tag,
+                        else_block.ins_begin,
+                        &mut else_block.next,
+                    );
                     else_block.into()
                 } else {
                     next = self.merge(prediction.false_tag, next);
@@ -589,13 +641,21 @@ impl IRGenerator {
                 for else_if in &des.elses {
                     let (_, else_if_prediction) = else_if.condition.visit_by(self)?;
                     let else_if_prediction = else_if_prediction.expect_boolean()?;
-                    let accept_block: InstJump = des.accept.visit_by(self)?;
+                    let mut accept_block: InstJump = des.accept.visit_by(self)?;
 
-                    self.back_patch(else_if_prediction.true_tag, accept_block.ins_begin);
+                    self.back_patch_or_merge(
+                        else_if_prediction.true_tag,
+                        accept_block.ins_begin,
+                        &mut accept_block.next,
+                    );
                     next = self.merge(accept_block.next, next);
 
-                    if let Some(else_block) = else_block {
-                        self.back_patch(else_if_prediction.false_tag, else_block.ins_begin)
+                    if let Some(mut else_block) = else_block {
+                        self.back_patch_or_merge(
+                            else_if_prediction.false_tag,
+                            else_block.ins_begin,
+                            &mut else_block.next,
+                        )
                     } else {
                         next = self.merge(last_prediction.false_tag, next);
                     }
@@ -609,22 +669,49 @@ impl IRGenerator {
                 }
             }
             Statement::While(des) => {
-                let (_, prediction): (Address, ExpInstJump) = des.condition.visit_by(self)?;
-                let prediction = prediction.expect_boolean()?;
-
                 self.push_loop_ctx();
-                let mut loop_body: InstJump = des.body.visit_by(self)?;
-                loop_body.next = self.pop_loop_ctx(loop_body.next);
+                let (_, prediction): (Address, ExpInstJump) = des.condition.visit_by(self)?;
+                let mut prediction = prediction.expect_boolean()?;
 
-                self.back_patch(loop_body.next, prediction.ins_begin);
-                self.back_patch(prediction.true_tag, loop_body.ins_begin);
-                self.instructions
-                    .push(IRInstruction::Jump(JumpInstruction::Goto(
-                        JumpAddress::Line(prediction.ins_begin),
+                let mut loop_body: InstJump = des.body.visit_by(self)?;
+                loop_body.next = self.pop_loop_ctx(prediction.ins_begin, loop_body.next);
+
+                self.back_patch_or_merge(
+                    loop_body.next,
+                    prediction.ins_begin,
+                    prediction.get_single_jump().1,
+                );
+                self.back_patch_or_merge(
+                    prediction.true_tag,
+                    loop_body.ins_begin,
+                    prediction.get_single_jump().1,
+                );
+
+                if let Some(prediction_begin) = prediction.ins_begin {
+                    self.push_inst(IRInstruction::Jump(JumpInstruction::Goto(
+                        JumpAddress::Line(prediction_begin),
                     )));
-                InstJump {
-                    ins_begin: prediction.ins_begin,
-                    next: prediction.false_tag.into(),
+                    InstJump {
+                        ins_begin: prediction.ins_begin,
+                        next: self.merge(prediction.false_tag, previous_next),
+                    }
+                } else {
+                    let (const_result, _) = prediction.get_single_jump();
+                    if const_result {
+                        // goto self, infinite loop
+                        let ins_begin = self.push_inst(IRInstruction::Jump(JumpInstruction::Goto(
+                            JumpAddress::Line(self.instructions.instructions.len()),
+                        )));
+                        InstJump {
+                            ins_begin: ins_begin.into(),
+                            next: None,
+                        }
+                    } else {
+                        InstJump {
+                            ins_begin: None,
+                            next: previous_next,
+                        }
+                    }
                 }
             }
             Statement::For(_) => todo!(),
