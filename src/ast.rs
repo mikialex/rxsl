@@ -1,9 +1,9 @@
-use crate::lexer::{Lexer, TokenSpan};
+use crate::lexer::{Lexer, Token};
 
 #[derive(Debug)]
 pub enum ParseError<'a> {
     Any(&'static str),
-    Unexpected(TokenSpan<'a>, &'a str),
+    Unexpected(Token<'a>, &'a str),
 }
 
 pub trait SyntaxElement: Sized {

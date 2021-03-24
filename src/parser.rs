@@ -20,9 +20,9 @@ impl SyntaxElement for FunctionDefine {
                 let name = parse_ident(input)?;
                 let arg = TypeExpression::parse(input)?;
                 arguments.push((name, arg));
-                match input.next() {
-                    (Token::Paren(')'), _) => break,
-                    (Token::Separator(','), _) => (),
+                match input.next().token {
+                    Token::Paren(')') => break,
+                    Token::Separator(',') => (),
                     other => return Err(ParseError::Unexpected(other, "argument list separator")),
                 }
             }
@@ -44,7 +44,7 @@ impl SyntaxElement for FunctionDefine {
 }
 
 fn parse_ident<'a>(lexer: &mut Lexer<'a>) -> Result<Ident, ParseError<'a>> {
-    let r = match lexer.next().0 {
+    let r = match lexer.next().token {
         Token::Word(name) => Ident {
             name: name.to_owned(),
         },
@@ -55,7 +55,7 @@ fn parse_ident<'a>(lexer: &mut Lexer<'a>) -> Result<Ident, ParseError<'a>> {
 
 impl SyntaxElement for TypeExpression {
     fn parse<'a>(lexer: &mut Lexer<'a>) -> Result<Self, ParseError<'a>> {
-        let r = match lexer.next().0 {
+        let r = match lexer.next().token {
             Token::Word(name) => TypeExpression::Named(Ident {
                 name: name.to_owned(),
             }),
@@ -71,7 +71,7 @@ impl SyntaxElement for Block {
             statements: Vec::new(),
         };
         lexer.expect(Token::Paren('{'))?;
-        while lexer.peek().0 != Token::Paren('}') {
+        while lexer.peek().token != Token::Paren('}') {
             block.statements.push(Statement::parse(lexer)?);
         }
         lexer.expect(Token::Paren('}'))?;
@@ -81,12 +81,12 @@ impl SyntaxElement for Block {
 
 impl SyntaxElement for Statement {
     fn parse<'a>(lexer: &mut Lexer<'a>) -> Result<Self, ParseError<'a>> {
-        let r = match lexer.peek().0 {
+        let r = match lexer.peek().token {
             Token::Keyword(keyword) => match keyword {
                 Declare(_) => parse_expression_like_statement(lexer)?,
                 Return => {
                     let _ = lexer.next();
-                    let value = if lexer.peek().0 == Token::Separator(';') {
+                    let value = if lexer.peek().token == Token::Separator(';') {
                         None
                     } else {
                         Some(Expression::parse(lexer)?)
@@ -110,7 +110,7 @@ impl SyntaxElement for Statement {
                     let accept = Block::parse(lexer)?;
                     let mut elses = Vec::new();
 
-                    while lexer.peek().0 == Token::Keyword(ElseIf) {
+                    while lexer.peek().token == Token::Keyword(ElseIf) {
                         lexer.expect(Token::Keyword(ElseIf))?;
                         elses.push(IfElse {
                             condition: Expression::parse(lexer)?,
@@ -164,7 +164,7 @@ impl SyntaxElement for Statement {
 pub fn parse_expression_like_statement<'a>(
     lexer: &mut Lexer<'a>,
 ) -> Result<Statement, ParseError<'a>> {
-    let r = match lexer.peek().0 {
+    let r = match lexer.peek().token {
         Token::Keyword(keyword) => match keyword {
             Declare(ty) => {
                 let _ = lexer.next();
@@ -201,8 +201,8 @@ pub fn parse_expression_like_statement<'a>(
 impl SyntaxElement for Expression {
     fn parse<'a>(lexer: &mut Lexer<'a>) -> Result<Self, ParseError<'a>> {
         let mut l = lexer.clone();
-        if let Token::Word(_) = l.next().0 {
-            if let Token::Operation('=') = l.next().0 {
+        if let Token::Word(_) = l.next().token {
+            if let Token::Operation('=') = l.next().token {
                 return parse_assignment_expression(lexer);
             }
         }
@@ -216,7 +216,7 @@ fn parse_assignment_expression<'a>(lexer: &mut Lexer<'a>) -> Result<Expression, 
         lexer,
         &|tk| tk == Token::Operation('='),
         &|lexer| {
-            let r = match lexer.next().0 {
+            let r = match lexer.next().token {
                 Token::Word(ident) => Ok(Ident {
                     name: ident.to_owned(),
                 }),
@@ -344,7 +344,7 @@ pub fn parse_exp_with_binary_operators_no_logic_no_bit<'a>(
 pub fn parse_exp_with_postfix<'a>(input: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {
     let mut result = parse_single_expression(input)?;
     loop {
-        result = match input.peek().0 {
+        result = match input.peek().token {
             Token::Paren('[') => {
                 let _ = input.next();
                 let index = parse_single_expression(input)?;
@@ -356,7 +356,7 @@ pub fn parse_exp_with_postfix<'a>(input: &mut Lexer<'a>) -> Result<Expression, P
             }
             Token::Separator('.') => {
                 let _ = input.next();
-                match input.next().0 {
+                match input.next().token {
                     Token::Word(ident) => Expression::ItemAccess {
                         from: Box::new(result),
                         to: Ident {
@@ -375,7 +375,7 @@ pub fn parse_exp_with_postfix<'a>(input: &mut Lexer<'a>) -> Result<Expression, P
 
 // EXP_SINGLE
 pub fn parse_single_expression<'a>(input: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {
-    let r = match input.next().0 {
+    let r = match input.next().token {
         Token::Number { .. } => Expression::Number {},
         Token::Bool(v) => Expression::Bool(v),
         Token::Operation('-') => {
@@ -400,7 +400,7 @@ pub fn parse_single_expression<'a>(input: &mut Lexer<'a>) -> Result<Expression, 
             inner
         }
         Token::Word(name) => {
-            if let Token::Paren('(') = input.peek().0 {
+            if let Token::Paren('(') = input.peek().token {
                 Expression::FunctionCall(parse_function_parameters(input, name)?)
             } else {
                 Expression::Ident(Ident {
@@ -440,8 +440,8 @@ fn parse_binary_like_left<'a, L, R>(
     assemble: impl Fn(L, Token<'a>, R) -> L,
 ) -> Result<L, ParseError<'a>> {
     let mut result = left_parser(lexer)?;
-    while separator(lexer.peek().0) {
-        let token = lexer.next().0;
+    while separator(lexer.peek().token) {
+        let token = lexer.next().token;
         let right = right_parser(lexer)?;
         result = assemble(result, token, right);
     }
@@ -458,8 +458,8 @@ fn parse_binary_like_right<'a, L, R>(
     let mut backup = lexer.clone();
     let left = left_parser(lexer);
     if let Ok(left) = left {
-        while separator(lexer.peek().0) {
-            let token = lexer.next().0;
+        while separator(lexer.peek().token) {
+            let token = lexer.next().token;
             let right =
                 parse_binary_like_right(lexer, separator, left_parser, right_parser, assemble)?;
             return Ok(assemble(left, token, right));
@@ -483,9 +483,9 @@ pub fn parse_function_parameters<'a>(
         loop {
             let arg = Expression::parse(input)?;
             arguments.push(arg);
-            match input.next() {
-                (Token::Paren(')'), _) => break,
-                (Token::Separator(','), _) => (),
+            match input.next().token {
+                Token::Paren(')') => break,
+                Token::Separator(',') => (),
                 other => return Err(ParseError::Unexpected(other, "argument list separator")),
             }
         }

@@ -41,13 +41,15 @@ pub enum Token<'a> {
     End,
 }
 
-pub type TokenSpan<'a> = (Token<'a>, Range<usize>);
+// pub type TokenSpan<'a> = (Token<'a>, Range<usize>);
 
-// pub struct TokenSpan<'a> {
-//     token: Token<'a>,
-//     range: SourceRange
-// }
+#[derive(Debug)]
+pub struct TokenSpan<'a> {
+    pub token: Token<'a>,
+    pub range: SourceRange,
+}
 
+#[derive(Debug)]
 pub struct SourceRange {
     pub column_range: Range<usize>,
     pub row_start: usize,
@@ -89,26 +91,22 @@ impl<'a> Lexer<'a> {
 
     #[must_use]
     pub fn next(&mut self) -> TokenSpan<'a> {
-        let mut start_char_offset = self.current_char_offset();
         loop {
-            let (token, rest) = self.consume_token(false);
-            self.input = rest;
-            match token {
-                Token::Trivia => start_char_offset = self.current_char_offset(),
-                _ => return (token, start_char_offset..self.current_char_offset()),
+            let token = self.consume_token(false);
+            match token.token {
+                Token::Trivia => continue,
+                _ => return token,
             }
         }
     }
 
     #[must_use]
     pub fn next_generic(&mut self) -> TokenSpan<'a> {
-        let mut start_char_offset = self.current_char_offset();
         loop {
-            let (token, rest) = self.consume_token(true);
-            self.input = rest;
-            match token {
-                Token::Trivia => start_char_offset = self.current_char_offset(),
-                _ => return (token, start_char_offset..self.current_char_offset()),
+            let token = self.consume_token(false);
+            match token.token {
+                Token::Trivia => continue,
+                _ => return token,
             }
         }
     }
@@ -121,7 +119,7 @@ impl<'a> Lexer<'a> {
 
     pub fn expect(&mut self, expected: Token<'a>) -> Result<(), ParseError<'a>> {
         let next = self.next();
-        if next.0 == expected {
+        if next.token == expected {
             Ok(())
         } else {
             let description = match expected {
@@ -143,13 +141,13 @@ impl<'a> Lexer<'a> {
                 Token::Bool(_) => "boolean",
                 Token::End => "",
             };
-            Err(ParseError::Unexpected(next, description))
+            Err(ParseError::Unexpected(next.token, description))
         }
     }
 
     pub fn skip(&mut self, what: Token<'_>) -> bool {
         let (peeked_token, rest) = self.peek_token_and_rest();
-        if peeked_token.0 == what {
+        if peeked_token.token == what {
             self.input = rest;
             true
         } else {
@@ -159,14 +157,27 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    fn consume_token(&mut self, generic: bool) -> (Token<'a>, &'a str) {
+    fn consume_token(&mut self, generic: bool) -> TokenSpan<'a> {
         let mut input = self.input;
+
+        let start_char_offset = self.current_char_offset();
+        let start_cursor = self.cursor.clone();
+
         let mut chars = input.chars();
         let cur = match chars.next() {
             Some(c) => c,
-            None => return (Token::End, input),
+            None => {
+                return TokenSpan {
+                    token: Token::End,
+                    range: SourceRange {
+                        column_range: start_cursor.row..self.cursor.column,
+                        row_start: start_cursor.column,
+                        row_end: self.cursor.column,
+                    },
+                }
+            }
         };
-        match cur {
+        let (token, rest) = match cur {
             ':' => {
                 input = chars.as_str();
                 if chars.next() == Some(':') {
@@ -272,6 +283,15 @@ impl<'a> Lexer<'a> {
                 (Token::Trivia, rest)
             }
             _ => (Token::Unknown(cur), chars.as_str()),
+        };
+        self.input = rest;
+        TokenSpan {
+            token,
+            range: SourceRange {
+                column_range: start_cursor.row..self.cursor.column,
+                row_start: start_cursor.column,
+                row_end: self.cursor.column,
+            },
         }
     }
 
