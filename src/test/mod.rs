@@ -89,6 +89,13 @@ fn parse_ir_test() {
     let input = r#"
 {
     let a = 1;
+    let b = false;
+    if b {
+        a = 2;
+    } else {
+        a = 3;
+    }
+    
 }
     "#;
 

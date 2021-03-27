@@ -130,8 +130,8 @@ impl InstructionList {
     }
 
     pub fn push(&mut self, ins: IRInstruction) -> usize {
-        self.instruction_pool.push(ins);
         let index = self.instruction_pool.len();
+        self.instruction_pool.push(ins);
         self.instructions.push(index);
         index
     }
@@ -461,7 +461,13 @@ impl Visitor<Expression, (Address, ExpInstJump), IRGenerationError> for IRGenera
             Expression::ArrayAccess { array, index } => todo!(),
             Expression::ItemAccess { from, to } => todo!(),
             Expression::Assign { left, right } => todo!(),
-            Expression::Number {} => todo!(),
+            Expression::Number {} => (
+                Address::Const(),
+                ExpInstJump::Common(InstJump {
+                    ins_begin: None,
+                    next: None,
+                }),
+            ),
             Expression::Bool(v) => {
                 let jmp = if *v {
                     let true_tag = self.push_unknown_jump(unknown_goto());
