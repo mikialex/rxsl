@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{ast::*, symbol_table::*, visitor::*};
+use crate::{ast::*, symbol_table::*};
 
 pub enum IRInstruction {
     Binary {
@@ -92,6 +92,8 @@ impl InstructionList {
 
 impl std::fmt::Display for InstructionList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "============ \n").unwrap();
+        write!(f, "instructions \n").unwrap();
         self.instructions
             .iter()
             .enumerate()
@@ -423,14 +425,62 @@ impl IRGenerator {
         op: BinaryOperator,
         right_ty: PrimitiveType,
     ) -> Result<PrimitiveType, IRGenerationError> {
-        todo!()
+        fn expect_both_scalar(
+            l: PrimitiveType,
+            r: PrimitiveType,
+            bool_re: bool,
+        ) -> Result<PrimitiveType, IRGenerationError> {
+            if l != r {
+                return Err(IRGenerationError::TypeError);
+            }
+            match l {
+                PrimitiveType::Scalar(_) => {}
+                _ => return Err(IRGenerationError::TypeError),
+            };
+            match r {
+                PrimitiveType::Scalar(_) => {}
+                _ => return Err(IRGenerationError::TypeError),
+            };
+            if bool_re {
+                Ok(PrimitiveType::Bool)
+            } else {
+                Ok(l)
+            }
+        }
+        fn expect_both_boolean(
+            l: PrimitiveType,
+            r: PrimitiveType,
+        ) -> Result<PrimitiveType, IRGenerationError> {
+            if l != PrimitiveType::Bool || r != PrimitiveType::Bool {
+                return Err(IRGenerationError::TypeError);
+            }
+            return Ok(PrimitiveType::Bool);
+        }
+        use BinaryOperator::*;
+        match op {
+            Add | Sub | Mul | Div | Mod => expect_both_scalar(left_ty, right_ty, false),
+            Less | LessEqual | Greater | GreaterEqual | Equal | NotEqual => {
+                expect_both_scalar(left_ty, right_ty, true)
+            }
+            And | Or | Xor => todo!(),
+            LogicalAnd | LogicalOr => expect_both_boolean(left_ty, right_ty),
+        }
     }
     fn unary_operator_type_checking(
         &self,
         ty: PrimitiveType,
         op: UnaryOperator,
     ) -> Result<PrimitiveType, IRGenerationError> {
-        todo!()
+        match op {
+            UnaryOperator::Neg => match ty {
+                PrimitiveType::Scalar(_) => Ok(ty),
+                PrimitiveType::Bool => Err(IRGenerationError::TypeError),
+            },
+            UnaryOperator::Not => match ty {
+                PrimitiveType::Scalar(_) => Err(IRGenerationError::TypeError),
+                PrimitiveType::Bool => Ok(ty),
+            },
+        }
     }
 
     fn gen_exp(
@@ -744,13 +794,15 @@ impl IRGenerator {
                 let (_, prediction, _) = self.gen_exp(&des.condition)?;
                 let prediction = prediction.expect_boolean()?;
                 let mut first_accept_block: InstJump = self.gen_block(&des.accept)?;
+
                 self.back_patch_or_merge(
                     prediction.true_tag,
                     first_accept_block.ins_begin,
                     &mut first_accept_block.next,
                 );
 
-                let mut next = first_accept_block.next;
+                let mut next = self.push_unknown_jump(unknown_goto()).1.into();
+                next = self.merge(first_accept_block.next, next);
 
                 let else_block = if let Some(reject) = &des.reject {
                     let mut else_block: InstJump = self.gen_block(reject)?;

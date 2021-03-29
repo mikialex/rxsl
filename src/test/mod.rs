@@ -90,8 +90,11 @@ fn parse_ir_test() {
 {
     let a = 1;
     let b = false;
+    let c = 2;
     if b {
         a = 2;
+        c = a;
+        let d = a + b;
     } else {
         a = 3;
     }
