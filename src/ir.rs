@@ -324,7 +324,7 @@ impl IRGenerator {
 
     pub fn generate(ast: &Block) -> Result<InstructionList, IRGenerationError> {
         let mut generator = Self::new();
-        let jmp: InstJump = ast.visit_by(&mut generator)?;
+        let jmp: InstJump = generator.gen_block(ast)?;
         generator.back_patch_termination(jmp.next);
         Ok(generator.instructions)
     }
@@ -619,12 +619,12 @@ pub struct InstJump {
     next: Option<JumpUnresolved>,
 }
 
-impl Visitor<Block, InstJump, IRGenerationError> for IRGenerator {
-    fn visit(&mut self, b: &Block) -> Result<InstJump, IRGenerationError> {
+impl IRGenerator {
+    fn gen_block(&mut self, b: &Block) -> Result<InstJump, IRGenerationError> {
         let mut ins_begin = None;
         let mut last_next: Option<JumpUnresolved> = None;
         for s in &b.statements {
-            let mut jump = self.code_gen_statement(s, last_next)?;
+            let mut jump = self.gen_statement(s, last_next)?;
             if ins_begin.is_none() {
                 ins_begin = jump.ins_begin;
             }
@@ -690,13 +690,13 @@ impl BooleanInstExpJump {
 }
 
 impl IRGenerator {
-    fn code_gen_statement(
+    fn gen_statement(
         &mut self,
         stmt: &Statement,
         previous_next: Option<JumpUnresolved>,
     ) -> Result<InstJump, IRGenerationError> {
         let re = match stmt {
-            Statement::Block(b) => b.visit_by(self)?,
+            Statement::Block(b) => self.gen_block(b)?,
             Statement::Declare { ty, name, init } => {
                 let (source, exp, vty) = self.gen_exp(init)?;
                 self.symbol_table
@@ -743,7 +743,7 @@ impl IRGenerator {
             Statement::If(des) => {
                 let (_, prediction, _) = self.gen_exp(&des.condition)?;
                 let prediction = prediction.expect_boolean()?;
-                let mut first_accept_block: InstJump = des.accept.visit_by(self)?;
+                let mut first_accept_block: InstJump = self.gen_block(&des.accept)?;
                 self.back_patch_or_merge(
                     prediction.true_tag,
                     first_accept_block.ins_begin,
@@ -753,7 +753,7 @@ impl IRGenerator {
                 let mut next = first_accept_block.next;
 
                 let else_block = if let Some(reject) = &des.reject {
-                    let mut else_block: InstJump = reject.visit_by(self)?;
+                    let mut else_block: InstJump = self.gen_block(reject)?;
                     next = self.merge(else_block.next, next);
 
                     // todo not consider else if block yet
@@ -789,7 +789,7 @@ impl IRGenerator {
                     //     is_first = false;
                     // }
 
-                    let mut accept_block: InstJump = des.accept.visit_by(self)?;
+                    let mut accept_block: InstJump = self.gen_block(&des.accept)?;
 
                     self.back_patch_or_merge(
                         else_if_prediction.true_tag,
@@ -821,7 +821,7 @@ impl IRGenerator {
                 let (_, prediction, _) = self.gen_exp(&des.condition)?;
                 let mut prediction = prediction.expect_boolean()?;
 
-                let mut loop_body: InstJump = des.body.visit_by(self)?;
+                let mut loop_body: InstJump = self.gen_block(&des.body)?;
                 loop_body.next = self.pop_loop_ctx(prediction.ins_begin, loop_body.next);
 
                 self.back_patch_or_merge(
