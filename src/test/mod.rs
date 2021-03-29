@@ -85,7 +85,7 @@ fn parse_st_test() {
 }
 
 #[test]
-fn parse_ir_test() {
+fn ir_test() {
     let input = r#"
 {
     let a = 1;
@@ -94,10 +94,16 @@ fn parse_ir_test() {
     if b {
         a = 2;
         c = a;
-        let d = a + b;
+        let d = a + c;
     } else {
         a = 3;
     }
+
+    // let d = true;
+
+    // if d || b {
+    //      a = a * c + a * a;
+    // }
     
 }
     "#;

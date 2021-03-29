@@ -673,6 +673,7 @@ impl IRGenerator {
     fn gen_block(&mut self, b: &Block) -> Result<InstJump, IRGenerationError> {
         let mut ins_begin = None;
         let mut last_next: Option<JumpUnresolved> = None;
+        self.symbol_table.push_scope();
         for s in &b.statements {
             let mut jump = self.gen_statement(s, last_next)?;
             if ins_begin.is_none() {
@@ -681,6 +682,7 @@ impl IRGenerator {
             self.back_patch_or_merge(last_next, jump.ins_begin, &mut jump.next);
             last_next = jump.next;
         }
+        self.symbol_table.pop_scope();
         Ok(InstJump {
             ins_begin,
             next: last_next,
