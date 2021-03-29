@@ -173,7 +173,7 @@ pub fn parse_expression_like_statement<'a>(
                     let r = Statement::Declare {
                         ty,
                         name: left,
-                        init: (*right).into(),
+                        init: *right,
                     };
                     lexer.expect(Token::Separator(';'))?;
                     r

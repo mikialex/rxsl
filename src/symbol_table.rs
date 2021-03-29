@@ -1,10 +1,10 @@
+use crate::ir::PrimitiveType;
 use std::collections::HashMap;
 
-use crate::ir::TypeInValidation;
-
+#[derive(Clone, Copy)]
 pub struct SymbolInfo {
     pub is_const: bool,
-    pub ty: TypeInValidation,
+    pub ty: PrimitiveType,
 }
 
 pub struct SymbolTable {

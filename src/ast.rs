@@ -57,7 +57,7 @@ pub enum Statement {
     Declare {
         ty: DeclarationType,
         name: Ident,
-        init: Option<Expression>,
+        init: Expression,
     },
     Empty,
     Expression(Expression),
