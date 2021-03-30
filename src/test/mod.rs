@@ -99,10 +99,14 @@ fn ir_test() {
         a = 3;
     }
 
-    // let d = true;
+    let d = true;
 
-    // if d || b {
-    //      a = a * c + a * a;
+    if d || b {
+         a = a * c + a * a;
+    }
+
+    // while a < 10 {
+    //     a = a + 1;
     // }
     
 }

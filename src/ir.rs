@@ -408,6 +408,35 @@ impl IRGenerator {
         }
     }
 
+    pub fn back_patch_or_merge_bool_exp(
+        &mut self,
+        jump: Option<JumpUnresolved>,
+        exp: &mut BooleanInstExpJump,
+    ) {
+        if let Some(line) = exp.ins_begin {
+            self.jump_resolver
+                .back_patch(jump, JumpAddress::Line(line), &mut self.instructions);
+        } else {
+            let single = exp.expect_single_jump();
+            *single.1 = self.merge(jump, *single.1);
+        }
+    }
+
+    pub fn back_patch_or_merge_bool_exp_with_given_line(
+        &mut self,
+        jump: Option<JumpUnresolved>,
+        line: Option<usize>,
+        exp: &mut BooleanInstExpJump,
+    ) {
+        if let Some(line) = line {
+            self.jump_resolver
+                .back_patch(jump, JumpAddress::Line(line), &mut self.instructions);
+        } else {
+            let single = exp.expect_single_jump();
+            *single.1 = self.merge(jump, *single.1);
+        }
+    }
+
     #[must_use]
     pub fn merge(
         &mut self,
@@ -517,6 +546,11 @@ impl IRGenerator {
                 let (address2, arg2, ty2) = self.gen_exp(right)?;
                 let compute = self.push_inst(IRInstruction::binary(*op, address1, address2));
 
+                let ins_begin = arg1
+                    .get_ins_begin()
+                    .or(arg2.get_ins_begin())
+                    .or(compute.into());
+
                 let re = match op {
                     BinaryOperator::Less
                     | BinaryOperator::LessEqual
@@ -536,11 +570,7 @@ impl IRGenerator {
                         let mut arg2 = arg2.expect_boolean()?;
                         match op {
                             BinaryOperator::LogicalOr => {
-                                self.back_patch_or_merge(
-                                    arg1.false_tag,
-                                    arg2.ins_begin,
-                                    arg2.get_single_jump().1,
-                                );
+                                self.back_patch_or_merge_bool_exp(arg1.false_tag, &mut arg2);
                                 ExpInstJump::Bool(BooleanInstExpJump {
                                     ins_begin: compute.into(),
                                     true_tag: self.merge(arg1.true_tag, arg2.true_tag),
@@ -548,11 +578,7 @@ impl IRGenerator {
                                 })
                             }
                             BinaryOperator::LogicalAnd => {
-                                self.back_patch_or_merge(
-                                    arg1.true_tag,
-                                    arg2.ins_begin,
-                                    &mut arg2.get_single_jump().1,
-                                );
+                                self.back_patch_or_merge_bool_exp(arg1.true_tag, &mut arg2);
                                 ExpInstJump::Bool(BooleanInstExpJump {
                                     ins_begin: compute.into(),
                                     true_tag: arg2.true_tag,
@@ -563,7 +589,7 @@ impl IRGenerator {
                         }
                     }
                     _ => ExpInstJump::Common(InstJump {
-                        ins_begin: compute.into(),
+                        ins_begin,
                         next: None,
                     }),
                 };
@@ -641,16 +667,16 @@ impl IRGenerator {
                     .map_err(|e| IRGenerationError::SymbolError(e))?
                     .ty;
                 let jmp = match ty {
-                    PrimitiveType::Bool => ExpInstJump::Bool(BooleanInstExpJump {
-                        ins_begin: None,
-                        true_tag: self
-                            .push_unknown_jump(unknown_goto_if_true(Address::Symbol(
-                                name.name.clone(),
-                            )))
-                            .1
-                            .into(),
-                        false_tag: self.push_unknown_jump(unknown_goto()).1.into(),
-                    }),
+                    PrimitiveType::Bool => {
+                        let jmp = self.push_unknown_jump(unknown_goto_if_true(Address::Symbol(
+                            name.name.clone(),
+                        )));
+                        ExpInstJump::Bool(BooleanInstExpJump {
+                            ins_begin: jmp.0.into(),
+                            true_tag: jmp.1.into(),
+                            false_tag: self.push_unknown_jump(unknown_goto()).1.into(),
+                        })
+                    }
                     _ => ExpInstJump::Common(InstJump {
                         ins_begin: None,
                         next: None,
@@ -726,7 +752,7 @@ impl BooleanInstExpJump {
             next: g.merge(self.true_tag, self.false_tag),
         }
     }
-    pub fn get_single_jump(&mut self) -> (bool, &mut Option<JumpUnresolved>) {
+    pub fn expect_single_jump(&mut self) -> (bool, &mut Option<JumpUnresolved>) {
         if self.true_tag.is_some() && self.false_tag.is_some() {
             panic!()
         }
@@ -772,10 +798,11 @@ impl IRGenerator {
                         self.back_patch(b.false_tag, ins_begin)
                     }
                 }
+                let ins_begin = exp.get_ins_begin().or(ins_begin.into());
 
                 InstJump {
-                    ins_begin: ins_begin.into(),
-                    next: previous_next,
+                    ins_begin: ins_begin,
+                    next: None,
                 }
             }
             Statement::Empty => InstJump {
@@ -878,15 +905,11 @@ impl IRGenerator {
                 let mut loop_body: InstJump = self.gen_block(&des.body)?;
                 loop_body.next = self.pop_loop_ctx(prediction.ins_begin, loop_body.next);
 
-                self.back_patch_or_merge(
-                    loop_body.next,
-                    prediction.ins_begin,
-                    prediction.get_single_jump().1,
-                );
-                self.back_patch_or_merge(
+                self.back_patch_or_merge_bool_exp(loop_body.next, &mut prediction);
+                self.back_patch_or_merge_bool_exp_with_given_line(
                     prediction.true_tag,
                     loop_body.ins_begin,
-                    prediction.get_single_jump().1,
+                    &mut prediction,
                 );
 
                 if let Some(prediction_begin) = prediction.ins_begin {
@@ -898,7 +921,7 @@ impl IRGenerator {
                         next: self.merge(prediction.false_tag, previous_next),
                     }
                 } else {
-                    let (const_result, _) = prediction.get_single_jump();
+                    let (const_result, _) = prediction.expect_single_jump();
                     if const_result {
                         // goto self, infinite loop
                         let ins_begin = self.push_inst(IRInstruction::Jump(JumpInstruction::Goto(
