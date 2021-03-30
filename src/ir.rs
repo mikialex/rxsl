@@ -918,7 +918,7 @@ impl IRGenerator {
                     )));
                     InstJump {
                         ins_begin: prediction.ins_begin,
-                        next: self.merge(prediction.false_tag, previous_next),
+                        next: prediction.false_tag,
                     }
                 } else {
                     let (const_result, _) = prediction.expect_single_jump();

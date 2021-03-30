@@ -85,7 +85,7 @@ fn parse_st_test() {
 }
 
 #[test]
-fn ir_test() {
+fn gen_ir_test() {
     let input = r#"
 {
     let a = 1;
@@ -105,9 +105,9 @@ fn ir_test() {
          a = a * c + a * a;
     }
 
-    // while a < 10 {
-    //     a = a + 1;
-    // }
+    while a < 10 {
+        a = a + 1;
+    }
     
 }
     "#;
