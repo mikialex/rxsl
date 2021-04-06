@@ -1,9 +1,4 @@
-use crate::{
-    ast::{Block, Expression, Statement, SyntaxElement},
-    ir::IRGenerator,
-    lexer::Lexer,
-    parser::*,
-};
+use crate::*;
 
 // cargo test -- --nocapture
 // can print log in unit test, but have some order issue
