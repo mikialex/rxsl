@@ -149,22 +149,29 @@ impl InstructionList {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub enum ScalarValueType {
+pub enum NumericType {
     Float,
     Int,
     UnsignedInt,
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub struct ScalarType {
-    pub ty: ScalarValueType,
-    pub size: usize,
+pub enum PrimitiveType {
+    Numeric(NumericType),
+    Bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub enum PrimitiveType {
-    Scalar(ScalarType),
-    Bool,
+pub enum PrimitiveConstValue {
+    Bool(bool),
+    Numeric(NumericTypeConstValue),
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum NumericTypeConstValue {
+    Float(f32),
+    Int(i32),
+    UnsignedInt(u32),
 }
 
 #[derive(Debug)]
@@ -436,11 +443,11 @@ impl IRGenerator {
                 return Err(IRGenerationError::TypeError);
             }
             match l {
-                PrimitiveType::Scalar(_) => {}
+                PrimitiveType::Numeric(_) => {}
                 _ => return Err(IRGenerationError::TypeError),
             };
             match r {
-                PrimitiveType::Scalar(_) => {}
+                PrimitiveType::Numeric(_) => {}
                 _ => return Err(IRGenerationError::TypeError),
             };
             if bool_re {
@@ -475,11 +482,11 @@ impl IRGenerator {
     ) -> Result<PrimitiveType, IRGenerationError> {
         match op {
             UnaryOperator::Neg => match ty {
-                PrimitiveType::Scalar(_) => Ok(ty),
+                PrimitiveType::Numeric(_) => Ok(ty),
                 PrimitiveType::Bool => Err(IRGenerationError::TypeError),
             },
             UnaryOperator::Not => match ty {
-                PrimitiveType::Scalar(_) => Err(IRGenerationError::TypeError),
+                PrimitiveType::Numeric(_) => Err(IRGenerationError::TypeError),
                 PrimitiveType::Bool => Ok(ty),
             },
         }
@@ -610,10 +617,7 @@ impl IRGenerator {
                     ins_begin: None,
                     next: None,
                 }),
-                PrimitiveType::Scalar(ScalarType {
-                    ty: ScalarValueType::Float,
-                    size: 1,
-                }),
+                PrimitiveType::Numeric(NumericType::Float),
             ),
             Expression::Bool(v) => {
                 let jmp = if *v {

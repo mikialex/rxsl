@@ -111,3 +111,12 @@ fn gen_ir_test() {
     let ins = IRGenerator::generate(&ast).unwrap();
     println!("{}", ins)
 }
+
+const test_component: &str = r#"
+pub struct Fog {
+    range: vec2,
+    color: vec2
+}
+
+
+"#;

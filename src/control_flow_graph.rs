@@ -1,5 +1,5 @@
 pub struct ControlFlowGraph {}
 
-pub struct ControlFlowGraphNode {
+pub struct BasicBlock {
     // instructions:
 }

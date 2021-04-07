@@ -1,28 +1,21 @@
-use crate::ir::PrimitiveType;
-
-pub trait ConstPrimitive {}
-
-pub struct PrimitiveConstValue {
-    pub value: Box<dyn ConstPrimitive>,
-    pub ty: PrimitiveType,
-}
+use crate::{
+    utils::storage::{DeduplicateVecStorage, Handle, Storage},
+    PrimitiveConstValue,
+};
 
 pub struct ConstPool {
-    literals: Vec<PrimitiveConstValue>,
+    consts: Storage<PrimitiveConstValue, DeduplicateVecStorage>,
 }
-#[derive(Clone, Copy)]
-pub struct ConstRef {
-    index: usize,
-}
+
+pub type ConstHandle = Handle<PrimitiveConstValue, DeduplicateVecStorage>;
 
 impl ConstPool {
     pub fn new() -> Self {
         Self {
-            literals: Vec::new(),
+            consts: Storage::new(),
         }
     }
-    pub fn insert_literal(&mut self) -> ConstRef {
-        // merge possible same value const
-        todo!()
+    pub fn insert_const(&mut self, v: PrimitiveConstValue) -> ConstHandle {
+        self.consts.insert(v)
     }
 }
