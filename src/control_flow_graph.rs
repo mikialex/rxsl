@@ -1,5 +1,7 @@
+use crate::InstructionList;
+
 pub struct ControlFlowGraph {}
 
 pub struct BasicBlock {
-    // instructions:
+    instructions: InstructionList,
 }

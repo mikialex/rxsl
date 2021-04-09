@@ -3,6 +3,7 @@ use crate::{
         BinaryOperator, Block, Expression, FunctionCall, FunctionDefine, Ident, If, IfElse,
         ParseError, Statement, SyntaxElement, TypeExpression, UnaryOperator, While,
     },
+    ir::*,
     lexer::{Keyword, Lexer, Token},
 };
 
@@ -376,8 +377,10 @@ pub fn parse_exp_with_postfix<'a>(input: &mut Lexer<'a>) -> Result<Expression, P
 // EXP_SINGLE
 pub fn parse_single_expression<'a>(input: &mut Lexer<'a>) -> Result<Expression, ParseError<'a>> {
     let r = match input.next().token {
-        Token::Number { .. } => Expression::Number {},
-        Token::Bool(v) => Expression::Bool(v),
+        Token::Number { .. } => Expression::PrimitiveConst(PrimitiveConstValue::Numeric(
+            NumericTypeConstValue::Float(1.), // todo
+        )),
+        Token::Bool(v) => Expression::PrimitiveConst(PrimitiveConstValue::Bool(v)),
         Token::Operation('-') => {
             let inner = Expression::parse(input)?;
             let inner = Box::new(inner);

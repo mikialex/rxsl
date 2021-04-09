@@ -11,5 +11,8 @@ pub mod utils;
 mod test;
 
 pub use ast::*;
+pub use const_pool::*;
 pub use ir::*;
+pub use ir_gen::*;
 pub use lexer::*;
+pub use symbol_table::*;

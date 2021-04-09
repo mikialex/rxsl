@@ -9,6 +9,12 @@ pub struct Handle<T, S: StorageBehavior<T>> {
     handle: S::Handle,
 }
 
+impl<T, S: StorageBehavior<T>> Clone for Handle<T, S> {
+    fn clone(&self) -> Self {
+        Self::new(self.handle)
+    }
+}
+
 impl<T, S: StorageBehavior<T>> Handle<T, S> {
     pub fn new(handle: S::Handle) -> Self {
         Self {

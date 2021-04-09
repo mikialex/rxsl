@@ -1,4 +1,4 @@
-use crate::lexer::{Lexer, Token};
+use crate::{NumericTypeConstValue, PrimitiveConstValue, lexer::{Lexer, Token}};
 
 #[derive(Debug)]
 pub enum ParseError<'a> {
@@ -111,8 +111,7 @@ pub enum Expression {
         left: Ident,
         right: Box<Self>,
     },
-    Number {},
-    Bool(bool),
+    PrimitiveConst(PrimitiveConstValue),
     Ident(Ident),
 }
 
