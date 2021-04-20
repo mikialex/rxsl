@@ -38,14 +38,23 @@ impl std::fmt::Display for ControlFlowGraph {
         self.graph
             .node_indices()
             .map(|idx| self.graph.node_weight(idx).unwrap())
-            .for_each(|bb| bb.fmt(f).unwrap());
+            .for_each(|bb| {
+                write!(f, "\n").unwrap();
+                bb.fmt(f).unwrap()
+            });
         Ok(())
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BasicBlockHandle {
     inner: NodeIndex,
+}
+
+impl std::fmt::Display for BasicBlockHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}:\n", self.inner)
+    }
 }
 
 pub struct BasicBlock {
