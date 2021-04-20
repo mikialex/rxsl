@@ -41,8 +41,6 @@ pub enum Token<'a> {
     End,
 }
 
-// pub type TokenSpan<'a> = (Token<'a>, Range<usize>);
-
 #[derive(Debug)]
 pub struct TokenSpan<'a> {
     pub token: Token<'a>,
@@ -83,10 +81,6 @@ impl<'a> Lexer<'a> {
         let token = cloned.next();
         let rest = cloned.input;
         (token, rest)
-    }
-
-    fn current_char_offset(&self) -> usize {
-        self.source.len() - self.input.len()
     }
 
     #[must_use]
@@ -159,8 +153,6 @@ impl<'a> Lexer<'a> {
 impl<'a> Lexer<'a> {
     fn consume_token(&mut self, generic: bool) -> TokenSpan<'a> {
         let mut input = self.input;
-
-        let start_char_offset = self.current_char_offset();
         let start_cursor = self.cursor.clone();
 
         let mut chars = input.chars();

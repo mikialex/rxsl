@@ -1,4 +1,14 @@
-use crate::{ast::*, ConstHandle};
+use crate::{
+    ast::*,
+    utils::storage::{Handle, Storage, VecStorage},
+    ConstHandle, ConstPool,
+};
+
+pub struct IR {
+    pub const_pool: ConstPool,
+    pub functions: Storage<InstructionList, VecStorage>,
+    pub entry: Handle<InstructionList, VecStorage>,
+}
 
 pub enum IRInstruction {
     Binary {
@@ -94,8 +104,6 @@ impl InstructionList {
 
 impl std::fmt::Display for InstructionList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "============ \n").unwrap();
-        write!(f, "instructions \n").unwrap();
         self.instructions
             .iter()
             .enumerate()

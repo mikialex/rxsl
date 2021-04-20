@@ -1,4 +1,7 @@
-use crate::{NumericTypeConstValue, PrimitiveConstValue, lexer::{Lexer, Token}};
+use crate::{
+    lexer::{Lexer, Token},
+    PrimitiveConstValue,
+};
 
 #[derive(Debug)]
 pub enum ParseError<'a> {

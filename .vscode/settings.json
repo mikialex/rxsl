@@ -3,6 +3,7 @@
     "Paren",
     "consts",
     "disambiguity",
+    "petgraph",
     "struct"
   ]
 }

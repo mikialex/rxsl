@@ -1,3 +1,5 @@
+#![feature(bool_to_option)]
+
 pub mod ast;
 pub mod const_pool;
 pub mod control_flow_graph;
