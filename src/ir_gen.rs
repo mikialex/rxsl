@@ -150,7 +150,7 @@ impl IRGenerator {
 
     pub fn pop_loop_ctx(
         &mut self,
-        loop_start: Option<usize>,
+        loop_start: Option<BasicBlockHandle>,
         previous_next: Option<JumpUnresolved>,
     ) -> Option<JumpUnresolved> {
         let ctx = self.loop_ctx.pop().expect("no loop context stored");
@@ -190,9 +190,9 @@ impl IRGenerator {
         (line, r)
     }
 
-    pub fn back_patch(&mut self, jump: Option<JumpUnresolved>, line: usize) {
+    pub fn back_patch(&mut self, jump: Option<JumpUnresolved>, bb: BasicBlockHandle) {
         self.jump_resolver
-            .back_patch(jump, JumpAddress::Line(line), &mut self.instructions)
+            .back_patch(jump, JumpAddress::BasicBlock(bb), &mut self.instructions)
     }
     pub fn back_patch_termination(&mut self, jump: Option<JumpUnresolved>) {
         self.jump_resolver
@@ -202,12 +202,12 @@ impl IRGenerator {
     pub fn back_patch_or_merge(
         &mut self,
         jump: Option<JumpUnresolved>,
-        line: Option<usize>,
+        bb: Option<BasicBlockHandle>,
         next: &mut Option<JumpUnresolved>,
     ) {
-        if let Some(line) = line {
+        if let Some(bb) = bb {
             self.jump_resolver
-                .back_patch(jump, JumpAddress::Line(line), &mut self.instructions)
+                .back_patch(jump, JumpAddress::BasicBlock(bb), &mut self.instructions)
         } else {
             *next = self.merge(jump, *next);
         }
@@ -218,9 +218,12 @@ impl IRGenerator {
         jump: Option<JumpUnresolved>,
         exp: &mut BooleanInstExpJump,
     ) {
-        if let Some(line) = exp.ins_begin {
-            self.jump_resolver
-                .back_patch(jump, JumpAddress::Line(line), &mut self.instructions);
+        if let Some(bb) = exp.ins_begin {
+            self.jump_resolver.back_patch(
+                jump,
+                JumpAddress::BasicBlock(bb),
+                &mut self.instructions,
+            );
         } else {
             let single = exp.expect_single_jump();
             *single.1 = self.merge(jump, *single.1);
@@ -234,8 +237,11 @@ impl IRGenerator {
         exp: &mut BooleanInstExpJump,
     ) {
         if let Some(line) = line {
-            self.jump_resolver
-                .back_patch(jump, JumpAddress::Line(line), &mut self.instructions);
+            self.jump_resolver.back_patch(
+                jump,
+                JumpAddress::BasicBlock(line),
+                &mut self.instructions,
+            );
         } else {
             let single = exp.expect_single_jump();
             *single.1 = self.merge(jump, *single.1);
@@ -498,7 +504,7 @@ impl IRGenerator {
 
 #[derive(Debug, Clone, Copy)]
 pub struct InstJump {
-    ins_begin: Option<usize>,
+    ins_begin: Option<BasicBlockHandle>,
     next: Option<JumpUnresolved>,
 }
 
@@ -547,7 +553,7 @@ impl ExpInstJump {
 
 #[derive(Debug, Clone, Copy)]
 pub struct BooleanInstExpJump {
-    ins_begin: Option<usize>,
+    ins_begin: Option<BasicBlockHandle>,
     true_tag: Option<JumpUnresolved>,
     false_tag: Option<JumpUnresolved>,
 }

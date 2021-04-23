@@ -1,5 +1,6 @@
 use crate::{
     ast::*,
+    control_flow_graph::BasicBlockHandle,
     utils::storage::{Handle, Storage, VecStorage},
     ConstHandle, ConstPool,
 };
@@ -48,7 +49,7 @@ pub fn unknown_goto_if_true(prediction: Address) -> JumpInstruction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JumpAddress {
     Unknown,
-    Line(usize),
+    BasicBlock(BasicBlockHandle),
     Termination,
 }
 
@@ -56,7 +57,7 @@ impl std::fmt::Display for JumpAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             JumpAddress::Unknown => write!(f, "UNKNOWN"),
-            JumpAddress::Line(line) => write!(f, "{}", line),
+            JumpAddress::BasicBlock(bb) => write!(f, "{}", bb),
             JumpAddress::Termination => write!(f, "TERMINATION"),
         }
     }

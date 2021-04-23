@@ -14,6 +14,7 @@ mod test;
 
 pub use ast::*;
 pub use const_pool::*;
+pub use control_flow_graph::*;
 pub use ir::*;
 pub use ir_gen::*;
 pub use lexer::*;
